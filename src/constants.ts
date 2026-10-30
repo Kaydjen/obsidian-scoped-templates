@@ -23,12 +23,15 @@ export const RESERVED_VARS: readonly string[] = [
 	"source",
 	"cursor",
 	"from",
+	"template",
+	"here",
 ];
 
 export const CURSOR_MARKER = "{{cursor}}";
+/** Separates alternatives in a value: the first one that is not empty is used. */
+export const OR_OPERATOR = "||";
 
 /** Faint placeholders for empty config keys in the Properties editor. */
-export const GHOST_INTO = "(note's folder)";
 export const GHOST_WHERE_ROOT = "/";
 export const GHOST_CLASS = "scoped-templates-ghost";
 /** Set on a view that shows a template file; scopes the template-only styles. */
@@ -102,6 +105,9 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 };
 
 export const DEFAULT_NAME_DATE_FORMAT = "YYMMDDHHmm";
+/** What an empty `tpl-filename` and `tpl-into` mean, written as the values they would be. */
+export const DEFAULT_FILENAME = `{{selection}} ${OR_OPERATOR} {{template}}-{{date:${DEFAULT_NAME_DATE_FORMAT}}}`;
+export const DEFAULT_INTO = "{{here}}";
 export const MAX_NAME_LENGTH = 200;
 
 export const NOTICE_OPEN_NOTE_FIRST = "Open a note first";

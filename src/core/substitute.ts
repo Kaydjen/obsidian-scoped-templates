@@ -1,4 +1,4 @@
-import { CURSOR_MARKER } from "../constants";
+import { CURSOR_MARKER, OR_OPERATOR } from "../constants";
 
 export interface SubstituteDeps {
 	formatDate(kind: "date" | "time", format: string | undefined): string;
@@ -8,9 +8,41 @@ export interface SubstituteDeps {
 	selection: string;
 	source: string;
 	from(key: string): unknown;
+	/** File name of the template (without extension); `{{template}}` stays as written when absent. */
+	template?: string;
+	/** Folder of the note the template runs from, as a vault path with a leading "/"; `{{here}}` stays as written when absent. */
+	here?: string;
 }
 
 const VARIABLE_RE = /\{\{([^{}]*)\}\}/g;
+
+/** The parts of `text` between `||` operators; an operator inside `{{ }}` is not one. */
+export function splitAlternatives(text: string): string[] {
+	const parts: string[] = [];
+	let depth = 0;
+	let start = 0;
+	for (let index = 0; index < text.length; index++) {
+		if (text.startsWith("{{", index)) {
+			depth++;
+			index++;
+		} else if (depth > 0 && text.startsWith("}}", index)) {
+			depth--;
+			index++;
+		} else if (depth === 0 && text.startsWith(OR_OPERATOR, index)) {
+			parts.push(text.slice(start, index));
+			index += OR_OPERATOR.length - 1;
+			start = index + 1;
+		}
+	}
+	parts.push(text.slice(start));
+	return parts;
+}
+
+/** Whether `text` uses `||` with nothing (or only spaces) before or after it. */
+export function hasEmptyAlternative(text: string): boolean {
+	const parts = splitAlternatives(text);
+	return parts.length > 1 && parts.some((part) => part.trim() === "");
+}
 
 export function formatValue(value: unknown): string {
 	if (value === null || value === undefined) return "";
@@ -39,6 +71,10 @@ export function substitute(text: string, deps: SubstituteDeps): string {
 				return deps.source;
 			case "from":
 				return arg === undefined ? match : formatValue(deps.from(arg.trim()));
+			case "template":
+				return deps.template ?? match;
+			case "here":
+				return deps.here ?? match;
 			case "cursor":
 				return match;
 		}
@@ -47,6 +83,22 @@ export function substitute(text: string, deps: SubstituteDeps): string {
 		}
 		return match;
 	});
+}
+
+/**
+ * Like `substitute`, but a value written as `a || b` becomes the first alternative that is not
+ * blank (the last one when all are). The text is split before substituting, so a substituted
+ * value that contains `||` is left alone. Without `||` it is exactly `substitute`.
+ */
+export function substituteChain(text: string, deps: SubstituteDeps): string {
+	const parts = splitAlternatives(text);
+	if (parts.length === 1) return substitute(text, deps);
+	let result = "";
+	for (const part of parts) {
+		result = substitute(part.trim(), deps);
+		if (result.trim() !== "") return result;
+	}
+	return result;
 }
 
 /** Removes every cursor marker and reports where the first one was. */

@@ -130,3 +130,36 @@ describe("config value edge cases", () => {
 		expect(parse("---\r\na:\r\n---\r\nx\r\ny").body).toBe("x\ny");
 	});
 });
+
+describe("|| in values", () => {
+	it("accepts alternatives in tpl-filename, tpl-into and properties", () => {
+		const parsed = parse(
+			'---\ntpl-filename: "{{selection}} || x"\ntpl-into: "{{from:project}} || {{here}}"\nstatus: "{{from:status}} || draft"\n---\n',
+		);
+		expect(parsed.config.filename).toBe("{{selection}} || x");
+		expect(parsed.config.into).toBe("{{from:project}} || {{here}}");
+		expect(parsed.frontmatter.status).toBe("{{from:status}} || draft");
+	});
+
+	it("rejects an operator without a value on both sides", () => {
+		expect(() => parse('---\ntpl-filename: "{{selection}} ||"\n---\n')).toThrow(/tpl-filename: "\|\|" needs a value on both sides/);
+		expect(() => parse('---\ntpl-into: "|| x"\n---\n')).toThrow(/tpl-into: "\|\|" needs a value/);
+		expect(() => parse('---\nstatus: "a || || b"\n---\n')).toThrow(/status: "\|\|" needs a value/);
+		expect(() => parse('---\nlist:\n  - "a ||"\n---\n')).toThrow(/list: "\|\|" needs a value/);
+	});
+
+	it("does not touch the body", () => {
+		expect(() => parse("---\nx: 1\n---\na || \n")).not.toThrow();
+	});
+
+	it("rejects {{title}} anywhere in the chain", () => {
+		expect(() => parse('---\ntpl-filename: "{{selection}} || {{title}}"\n---\n')).toThrow(/cannot use \{\{title\}\}/);
+	});
+});
+
+describe("reserved variable names", () => {
+	it("keeps {{template}} and {{here}} out of folder labels", () => {
+		expect(() => parse('---\ntpl-where: "{{here}}"\n---\n')).toThrow(/already a variable/);
+		expect(() => parse('---\ntpl-where: "{{template}}"\n---\n')).toThrow(/already a variable/);
+	});
+});

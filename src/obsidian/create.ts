@@ -1,9 +1,9 @@
 import { MarkdownView, Notice, TFile, normalizePath, stringifyYaml } from "obsidian";
-import { DEFAULT_NAME_DATE_FORMAT } from "../constants";
+import { DEFAULT_FILENAME, DEFAULT_NAME_DATE_FORMAT } from "../constants";
 import { sanitizeAlias, sanitizeName, uniqueName } from "../core/filename";
 import { buildFrontmatter, serializeFrontmatter } from "../core/frontmatter";
 import { joinPath, resolveFolder } from "../core/paths";
-import { extractCursor, substitute } from "../core/substitute";
+import { extractCursor, splitAlternatives, substitute, substituteChain } from "../core/substitute";
 import { chooseTemplate } from "./choose";
 import {
 	currentTime,
@@ -45,15 +45,24 @@ async function createNote(host: Host, context: ActiveContext, picked: PickedTemp
 		folder: context.folder,
 		root: entry.scope.root,
 	});
-	const common = { now, captures, selection: context.selection, from: resolveSourceValue };
+	const common = {
+		now,
+		captures,
+		selection: context.selection,
+		from: resolveSourceValue,
+		template: entry.file.basename,
+		here: `/${context.folder}`,
+	};
 
 	// Stage 1: folder and file name. The title is not known yet.
 	const early = makeSubstituteDeps(host, { ...common, source: "" });
-	const into = config.into === undefined ? undefined : substitute(config.into, early);
+	let into = config.into === undefined ? undefined : substituteChain(config.into, early);
+	// Alternatives that are all empty leave the folder unset, like an empty tpl-into.
+	if (config.into !== undefined && into?.trim() === "" && splitAlternatives(config.into).length > 1) into = undefined;
 	const folderPath = resolveFolder(into, entry.scope.root, context.folder, settings.folderName);
 
 	const defaultName = `${entry.file.basename}-${now.format(DEFAULT_NAME_DATE_FORMAT)}`;
-	let rawName = config.filename !== undefined ? substitute(config.filename, early) : context.selection || defaultName;
+	const rawName = substituteChain(config.filename ?? DEFAULT_FILENAME, early);
 	if (rawName.includes("{{")) throw new Error(`Unresolved variable in file name: ${rawName}`);
 	let name = sanitizeName(rawName);
 	if (name === "") name = sanitizeName(defaultName);

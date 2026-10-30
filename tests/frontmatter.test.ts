@@ -126,3 +126,29 @@ describe("round trip with a real template", () => {
 		expect(reparsed).toEqual(built);
 	});
 });
+
+describe("buildFrontmatter with ||", () => {
+	it("uses the first alternative that has a value and keeps its type", () => {
+		expect(buildFrontmatter({ status: "{{from:nothing}} || {{from:status}}" }, deps)).toEqual({ status: "[[done]]" });
+		expect(buildFrontmatter({ project: "{{from:nothing}} || {{from:project}}" }, deps)).toEqual({ project: ["[[a9-pascaline]]"] });
+	});
+
+	it("falls back to plain text and trims the parts", () => {
+		expect(buildFrontmatter({ status: "{{from:nothing}} || draft" }, deps)).toEqual({ status: "draft" });
+	});
+
+	it("gives null when every alternative is a missing source", () => {
+		expect(buildFrontmatter({ x: "{{from:a}} || {{from:b}}" }, deps)).toEqual({ x: null });
+	});
+
+	it("works for items of a list and inside maps", () => {
+		expect(buildFrontmatter({ tags: ["{{from:nothing}} || a", "b"], map: { k: "{{from:nothing}} || c" } }, deps)).toEqual({
+			tags: ["a", "b"],
+			map: { k: "c" },
+		});
+	});
+
+	it("leaves a value without || exactly as before", () => {
+		expect(buildFrontmatter({ a: "x | y", b: "{{from:nothing}}" }, deps)).toEqual({ a: "x | y", b: null });
+	});
+});

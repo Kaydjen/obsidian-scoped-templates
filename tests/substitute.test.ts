@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { extractCursor, formatValue, substitute, type SubstituteDeps } from "../src/core/substitute";
+import {
+	extractCursor,
+	formatValue,
+	hasEmptyAlternative,
+	splitAlternatives,
+	substitute,
+	substituteChain,
+	type SubstituteDeps,
+} from "../src/core/substitute";
 
 const deps = (overrides: Partial<SubstituteDeps> = {}): SubstituteDeps => ({
 	formatDate: (kind, format) => `${kind}(${format ?? "default"})`,
@@ -95,5 +103,66 @@ describe("extractCursor edge cases", () => {
 
 	it("does not treat a spaced marker as a cursor", () => {
 		expect(extractCursor("a{{ cursor }}")).toEqual({ text: "a{{ cursor }}", offset: null });
+	});
+});
+
+describe("template and here", () => {
+	it("resolves {{template}} and {{here}} when known and keeps them otherwise", () => {
+		expect(substitute("{{template}}-{{here}}", deps({ template: "decision", here: "/project/a" }))).toBe("decision-/project/a");
+		expect(substitute("{{template}} {{here}}", deps())).toBe("{{template}} {{here}}");
+	});
+});
+
+describe("splitAlternatives", () => {
+	it("splits on || and keeps text without it whole", () => {
+		expect(splitAlternatives("a || b")).toEqual(["a ", " b"]);
+		expect(splitAlternatives("a || b || c")).toEqual(["a ", " b ", " c"]);
+		expect(splitAlternatives("plain | single")).toEqual(["plain | single"]);
+		expect(splitAlternatives("")).toEqual([""]);
+	});
+
+	it("does not split inside braces", () => {
+		expect(splitAlternatives("{{date:HH||mm}} || x")).toEqual(["{{date:HH||mm}} ", " x"]);
+	});
+
+	it("reports an operator with nothing on one side", () => {
+		expect(hasEmptyAlternative("a ||")).toBe(true);
+		expect(hasEmptyAlternative("|| a")).toBe(true);
+		expect(hasEmptyAlternative("a || || b")).toBe(true);
+		expect(hasEmptyAlternative("a || b")).toBe(false);
+		expect(hasEmptyAlternative("a")).toBe(false);
+		expect(hasEmptyAlternative("")).toBe(false);
+	});
+});
+
+describe("substituteChain", () => {
+	const name = "{{selection}} || {{template}}-{{date:YYMMDDHHmm}}";
+	const chain = (overrides: Partial<SubstituteDeps> = {}) =>
+		deps({ template: "decision", ...overrides });
+
+	it("uses the first alternative that has a value", () => {
+		expect(substituteChain(name, chain())).toBe("picked text");
+		expect(substituteChain(name, chain({ selection: "" }))).toBe("decision-date(YYMMDDHHmm)");
+		expect(substituteChain(name, chain({ selection: "   " }))).toBe("decision-date(YYMMDDHHmm)");
+	});
+
+	it("falls through several alternatives and returns the last when all are empty", () => {
+		const empty = { selection: "", source: "", from: () => undefined };
+		expect(substituteChain("{{selection}} || {{from:x}} || end", chain(empty))).toBe("end");
+		expect(substituteChain("{{selection}} || {{source}}", chain(empty))).toBe("");
+	});
+
+	it("does not split a substituted value that contains ||", () => {
+		expect(substituteChain("{{selection}} || x", chain({ selection: "a || b" }))).toBe("a || b");
+	});
+
+	it("keeps an unknown variable as written, so it is not skipped", () => {
+		expect(substituteChain("{{typo}} || ok", chain())).toBe("{{typo}}");
+	});
+
+	it("is exactly substitute() without ||", () => {
+		for (const text of ["{{date}} {{time}}", "  {{selection}}  ", "a | b", ""]) {
+			expect(substituteChain(text, chain())).toBe(substitute(text, chain()));
+		}
 	});
 });

@@ -1,5 +1,6 @@
-import { CONFIG_PREFIX, KEYS, KNOWN_KEYS } from "../constants";
+import { CONFIG_PREFIX, KEYS, KNOWN_KEYS, OR_OPERATOR } from "../constants";
 import { parsePattern, type Pattern } from "./pattern";
+import { hasEmptyAlternative } from "./substitute";
 
 export interface TemplateConfig {
 	label?: string;
@@ -49,6 +50,17 @@ export function quoteTemplateValues(yaml: string): string {
 		.join("\n");
 }
 
+/** Throws when a value uses `||` without anything on one of its sides; strings inside lists and maps count too. */
+function checkAlternatives(value: unknown, key: string): void {
+	if (typeof value === "string") {
+		if (hasEmptyAlternative(value)) throw new Error(`${key}: "${OR_OPERATOR}" needs a value on both sides`);
+	} else if (Array.isArray(value)) {
+		for (const item of value) checkAlternatives(item, key);
+	} else if (value !== null && typeof value === "object") {
+		for (const item of Object.values(value)) checkAlternatives(item, key);
+	}
+}
+
 function asString(value: unknown, key: string): string | undefined {
 	if (value === undefined || value === null) return undefined;
 	if (typeof value !== "string") throw new Error(`${key} must be text`);
@@ -80,6 +92,8 @@ function extractConfig(raw: Record<string, unknown>): TemplateConfig {
 	const filename = asString(raw[KEYS.filename], KEYS.filename);
 	if (into !== undefined && TITLE_RE.test(into)) throw new Error(`${KEYS.into} cannot use {{title}}`);
 	if (filename !== undefined && TITLE_RE.test(filename)) throw new Error(`${KEYS.filename} cannot use {{title}}`);
+	if (into !== undefined) checkAlternatives(into, KEYS.into);
+	if (filename !== undefined) checkAlternatives(filename, KEYS.filename);
 
 	const open = raw[KEYS.open];
 	if (open !== undefined && open !== null && typeof open !== "boolean") {
@@ -124,7 +138,9 @@ export function parseTemplate(text: string, parseYaml: ParseYaml): ParsedTemplat
 	const config = extractConfig(raw);
 	const frontmatter: Record<string, unknown> = {};
 	for (const [key, value] of Object.entries(raw)) {
-		if (!key.startsWith(CONFIG_PREFIX)) frontmatter[key] = value;
+		if (key.startsWith(CONFIG_PREFIX)) continue;
+		checkAlternatives(value, key);
+		frontmatter[key] = value;
 	}
 	return { config, frontmatter, body };
 }

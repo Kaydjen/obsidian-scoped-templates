@@ -65,6 +65,8 @@ function compute(
 		selection: context.selection,
 		source: "",
 		from,
+		template: entry.file.basename,
+		here: `/${context.folder}`,
 	});
 	const templateFrontmatter = buildFrontmatter(entry.parsed.frontmatter, {
 		text: (value) => substitute(value, deps),

@@ -40,7 +40,8 @@ describe("ghostDefaults", () => {
 		const ghost = ghostDefaults("decision", "project");
 		expect(ghost["tpl-label"]).toBe("decision");
 		expect(ghost["tpl-where"]).toBe("project");
-		expect(ghost["tpl-filename"]).toBe("{{selection}} | decision-{{date:YYMMDDHHmm}}");
+		expect(ghost["tpl-filename"]).toBe("{{selection}} || {{template}}-{{date:YYMMDDHHmm}}");
+		expect(ghost["tpl-into"]).toBe("{{here}}");
 		expect(ghostDefaults("x", "")["tpl-where"]).toBe("/");
 	});
 });

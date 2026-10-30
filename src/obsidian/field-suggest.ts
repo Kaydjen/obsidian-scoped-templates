@@ -1,9 +1,17 @@
 import { AbstractInputSuggest, type App } from "obsidian";
 import { DETAIL_EXAMPLE_LABEL, PANE_CLASS } from "../constants";
-import { fieldHelp, suggest, type CatalogContext, type FieldKind, type Suggestion, type Suggestions } from "../core/catalog";
+import {
+	fieldHelp,
+	suggest,
+	type CatalogContext,
+	type Detail,
+	type FieldKind,
+	type Suggestion,
+	type Suggestions,
+} from "../core/catalog";
 
 /** An insertion ending like this expects more typing, so the list is reopened. */
-const CONTINUES = /[/:]$/;
+const CONTINUES = /(?:[/:]|\|\| )$/;
 
 export const PANE_GAP = 6;
 export const PANE_WIDTH = 300;
@@ -11,16 +19,21 @@ export const PANE_WIDTH = 300;
 /** The same definition block is used beside the Properties list and in the editor's completion popup. */
 export function renderDetail(parent: HTMLElement, item: Suggestion): void {
 	parent.createDiv({ cls: "scoped-templates-detail-title", text: item.label });
-	parent.createDiv({ cls: "scoped-templates-detail-text", text: item.definition });
-	if (item.scenario !== undefined && item.scenario !== "") {
+	renderBlock(parent, item);
+	if (item.also) renderBlock(parent.createDiv({ cls: "scoped-templates-detail-also" }), item.also);
+}
+
+function renderBlock(parent: HTMLElement, detail: Detail): void {
+	parent.createDiv({ cls: "scoped-templates-detail-text", text: detail.definition });
+	if (detail.scenario !== undefined && detail.scenario !== "") {
 		const row = parent.createDiv({ cls: "scoped-templates-detail-scenario" });
 		row.createEl("strong", { text: DETAIL_EXAMPLE_LABEL });
-		row.createSpan({ text: `: ${item.scenario}` });
+		row.createSpan({ text: `: ${detail.scenario}` });
 	}
-	if (item.example !== undefined && item.example !== "") {
+	if (detail.example !== undefined && detail.example !== "") {
 		const row = parent.createDiv({ cls: "scoped-templates-detail-example" });
-		row.createSpan({ text: `${item.exampleLabel ?? "e.g."} ` });
-		row.createEl("code", { text: item.example });
+		row.createSpan({ text: `${detail.exampleLabel ?? "e.g."} ` });
+		row.createEl("code", { text: detail.example });
 	}
 }
 

@@ -1,17 +1,13 @@
-import { KEYS } from "../constants";
+import { DEFAULT_FILENAME, DEFAULT_NAME_DATE_FORMAT, KEYS, OR_OPERATOR } from "../constants";
 import { joinPath, splitPath } from "./paths";
 import { isCaptureName } from "./pattern";
+import { splitAlternatives } from "./substitute";
 
 /** Where a value is being typed; decides which suggestions make sense. */
 export type FieldKind = "where" | "except" | "into" | "filename" | "value" | "body";
 
-export interface Suggestion {
-	/** What the list shows. */
-	label: string;
-	/** What replaces the typed token. */
-	insert: string;
-	/** Short kind word shown next to the label. */
-	tag: string;
+/** What a panel says about one thing: what it lets the user do, one case, and a computed value. */
+export interface Detail {
 	/** What the item gives the user. */
 	definition: string;
 	/** One concrete case ending in a result; shown after the "Example" label. */
@@ -20,6 +16,17 @@ export interface Suggestion {
 	example?: string;
 	/** Word in front of the example; "e.g." when absent. */
 	exampleLabel?: string;
+}
+
+export interface Suggestion extends Detail {
+	/** What the list shows. */
+	label: string;
+	/** What replaces the typed token. */
+	insert: string;
+	/** Short kind word shown next to the label. */
+	tag: string;
+	/** A second thing worth knowing about the item, shown as its own block under the first. */
+	also?: Detail;
 	/** Explains the field itself; choosing it changes nothing. */
 	help?: boolean;
 }
@@ -56,6 +63,10 @@ const DATE_FORMATS = ["YYYY-MM-DD", "YYMMDDHHmm", "YYYY-MM-DDTHH:mm:ss", "DD.MM.
 const TIME_FORMATS = ["HH:mm", "HH:mm:ss", "HHmm"];
 const RESULT_LABEL = "Result:";
 const SAMPLE_NOTE = "Notes";
+const SAMPLE_SELECTION = "Meeting";
+const SAMPLE_TEMPLATE = "Decision";
+const TAG_OR = "or";
+const HERE = "{{here}}";
 
 /**
  * Every text first says what the item lets the user do, then gives one example that ends in a result.
@@ -66,7 +77,7 @@ const groupOf = (kind: FieldKind): Group => (kind === "into" ? "folder" : kind =
 
 const CREATED_IF_MISSING = "If that folder does not exist yet, it is created automatically.";
 const FORMAT_LETTERS =
-	"To use another format, change the letters after the colon: YY year, MM month, DD day, HH hour, mm minute.";
+	"Lets you change how the date is written, by changing the letters after the colon: YY year, MM month, DD day, HH hour, mm minute.";
 const NEXT_LIST = "Choose the property in the next list.";
 const ORIGIN = "the note you run the template from";
 
@@ -93,8 +104,8 @@ const DATE = {
 const MONTH = `Lets the new note be saved in a folder named with the year and month of creation, so each month gets its own folder. ${CREATED_IF_MISSING}`;
 
 const MINUTE = {
-	name: `Lets the new note's name include the date and time of creation, down to the minute. ${FORMAT_LETTERS}`,
-	note: `Lets the note show the date and time of creation, down to the minute. ${FORMAT_LETTERS}`,
+	name: `Lets the new note's name include the date and time of creation, down to the minute.`,
+	note: `Lets the note show the date and time of creation, down to the minute.`,
 };
 
 const DATE_FORMAT = {
@@ -113,7 +124,7 @@ const TIME_FORMAT = {
 	note: "Lets the note show the time of creation, in this format.",
 };
 
-const fromText = (group: Group, key: string | undefined, ctx: CatalogContext): { definition: string; scenario?: string } => {
+const fromText = (group: Group, key: string | undefined, ctx: CatalogContext): Detail & { also?: Detail } => {
 	if (key === undefined) {
 		return {
 			definition:
@@ -138,7 +149,11 @@ const fromText = (group: Group, key: string | undefined, ctx: CatalogContext): {
 				}
 			: {
 					definition: `Lets the note copy the "${key}" property of ${ORIGIN}.`,
-					scenario: `${given}, so the value becomes "${value}". If it has none, the value is taken from nearby notes when they all agree; otherwise it stays empty.`,
+					scenario: `${given}, so the value becomes "${value}".`,
+					also: {
+						definition: "Lets the value come from the notes around it when the source note has no such property.",
+						scenario: `you run the template from a note without "${key}", and the notes next to it all have "${value}", so the value becomes "${value}". If they disagree, it stays empty.`,
+					},
 				};
 };
 
@@ -168,31 +183,75 @@ const variable = (label: string, definition: string, scenario?: string, insert =
 	return item;
 };
 
+/** How to write the date another way, for the items that show a fixed format. */
+function dateFormat(group: Group, ctx: CatalogContext): Detail {
+	const format = "DD.MM.YYYY";
+	return {
+		definition: FORMAT_LETTERS,
+		scenario: `you write "{{date:${format}}}", so ${created(group, "today", ctx.format("date", format))}`,
+	};
+}
+
+/** A name that leaves out {{selection}} frees the selected text to become the label of the link. */
+function linkLabel(ctx: CatalogContext): Detail {
+	const template = ctx.templateName ?? SAMPLE_TEMPLATE;
+	const name = `${template}-${ctx.format("date", DEFAULT_NAME_DATE_FORMAT)}`;
+	return {
+		definition: "Lets the text you selected stay as the label of the link, when the name does not include {{selection}}.",
+		scenario: `the name is "${template}-{{date:${DEFAULT_NAME_DATE_FORMAT}}}" and you select "${SAMPLE_SELECTION}", so the note is named "${name}" and the link to it reads "${SAMPLE_SELECTION}".`,
+		example: `[[${name}|${SAMPLE_SELECTION}]]`,
+		exampleLabel: RESULT_LABEL,
+	};
+}
+
 /** Variables usable in a field of this kind, in the order the list shows them. */
 function variablesFor(kind: FieldKind, ctx: CatalogContext): Suggestion[] {
 	const group = groupOf(kind);
 	// A folder path is not sanitized like a file name: no time (has ":") and no free text.
 	const forFolder = group === "folder";
-	const items: Suggestion[] = [
+	const items: Suggestion[] = [];
+	if (forFolder) {
+		const folder = sampleFolder(ctx);
+		items.push(
+			variable(
+				HERE,
+				`Lets the new note be saved next to ${ORIGIN}, or in a folder inside it when more of the path follows.`,
+				`${runFrom(ctx)}, so the new note is saved in ${folder === "" ? "the vault root" : `"${folder}/"`}.`,
+			),
+		);
+	}
+	if (group === "name") {
+		const name = ctx.templateName ?? SAMPLE_TEMPLATE;
+		items.push(
+			variable(
+				"{{template}}",
+				"Lets the new note's name start with the template's file name. If you rename the template, new notes follow.",
+				`the template file is "${name}", so "${name}" appears in the new note's name.`,
+			),
+		);
+	}
+	items.push(
 		variable("{{date}}", DATE[group], created(group, "today", ctx.format("date"))),
 		forFolder
 			? variable("{{date:YYYY-MM}}", MONTH, created(group, "today", ctx.format("date", "YYYY-MM")))
-			: variable("{{date:YYMMDDHHmm}}", MINUTE[group as "name" | "note"], created(group, "now", ctx.format("date", "YYMMDDHHmm"))),
-	];
+			: {
+					...variable("{{date:YYMMDDHHmm}}", MINUTE[group as "name" | "note"], created(group, "now", ctx.format("date", "YYMMDDHHmm"))),
+					also: dateFormat(group, ctx),
+				},
+	);
 	if (!forFolder) {
 		const textGroup = group as "name" | "note";
-		items.push(
-			variable("{{time}}", TIME[textGroup], created(group, "now", ctx.format("time"))),
-			variable(
-				"{{selection}}",
-				group === "name"
-					? "Lets the new note's name include the text you selected."
-					: `Lets the note contain the text you selected in ${ORIGIN}.`,
-				group === "name"
-					? `you select "Pascaline" in ${ORIGIN}, so "Pascaline" appears in the new note's name. Without a selection, nothing is added.`
-					: `you select "Pascaline", so the value becomes "Pascaline". Empty if nothing was selected.`,
-			),
+		const selection = variable(
+			"{{selection}}",
+			group === "name"
+				? "Lets the new note's name include the text you selected."
+				: `Lets the note contain the text you selected in ${ORIGIN}.`,
+			group === "name"
+				? `you select "${SAMPLE_SELECTION}" in ${ORIGIN}, so "${SAMPLE_SELECTION}" appears in the new note's name. Without a selection, nothing is added.`
+				: `you select "${SAMPLE_SELECTION}", so the value becomes "${SAMPLE_SELECTION}". Empty if nothing was selected.`,
 		);
+		if (group === "name") selection.also = linkLabel(ctx);
+		items.push(variable("{{time}}", TIME[textGroup], created(group, "now", ctx.format("time"))), selection);
 	}
 	const from = fromText(group, undefined, ctx);
 	items.push(variable("{{from:}}", from.definition, from.scenario, "{{from:"));
@@ -235,7 +294,9 @@ function variableSuggestions(kind: FieldKind, text: string, caret: number, open:
 			.filter((key) => key.toLowerCase().includes(query))
 			.map((key) => {
 				const entry = fromText(group, key, ctx);
-				return variable(`{{from:${key}}}`, entry.definition, entry.scenario);
+				const item = variable(`{{from:${key}}}`, entry.definition, entry.scenario);
+				if (entry.also) item.also = entry.also;
+				return item;
 			});
 	} else if (lower.startsWith("date:") || lower.startsWith("time:")) {
 		const isDate = lower.startsWith("date:");
@@ -250,7 +311,9 @@ function variableSuggestions(kind: FieldKind, text: string, caret: number, open:
 				return variable(`{{${isDate ? "date" : "time"}:${format}}}`, definition, created(group, when, value));
 			});
 	} else {
-		items = variablesFor(kind, ctx).filter((item) => item.label.toLowerCase().includes(`{{${lower}`));
+		items = variablesFor(kind, ctx).filter(
+			(item) => item.label.toLowerCase().includes(`{{${lower}`) && (item.label !== HERE || startsAlternative(text, open)),
+		);
 	}
 	return { from: open, to, items };
 }
@@ -392,6 +455,8 @@ function pathSuggestions(kind: FieldKind, text: string, caret: number, ctx: Cata
 	if (kind === "into" && (token === "" || token.startsWith("{"))) {
 		for (const item of variablesFor(kind, ctx)) {
 			if (!item.label.startsWith(token)) continue;
+			// It is a whole path, so it can only start the value.
+			if (item.label === HERE && tokenStart !== 0) continue;
 			const isCapture = ctx.captures.some((name) => item.label === `{{${name}}}`);
 			items.push(isCapture ? { ...item, insert: `${item.insert}/` } : item);
 		}
@@ -399,32 +464,123 @@ function pathSuggestions(kind: FieldKind, text: string, caret: number, ctx: Cata
 	return { from: tokenStart, to: caret, items };
 }
 
-/** The value with every variable that has a known example replaced; others stay as written. */
-function previewText(text: string, ctx: CatalogContext): string {
+/** One alternative with every variable that has a known example replaced; others stay as written. */
+function previewPart(text: string, ctx: CatalogContext, selection: string): string {
 	return text.replace(/\{\{\s*([^{}]*?)\s*\}\}/g, (whole, inner: string) => {
 		const [rawName = "", ...rest] = inner.split(":");
 		const name = rawName.trim();
-		const format = rest.length > 0 ? rest.join(":") : undefined;
-		if (name === "date" || name === "time") return ctx.format(name, format);
+		const argument = rest.length > 0 ? rest.join(":") : undefined;
+		switch (name) {
+			case "date":
+			case "time":
+				return ctx.format(name, argument);
+			case "selection":
+				return selection;
+			case "template":
+				return ctx.templateName ?? whole;
+			case "here":
+				return `/${sampleFolder(ctx)}`;
+			case "from":
+				return (argument === undefined ? undefined : ctx.propertyExample?.(argument.trim())) ?? whole;
+		}
 		return ctx.captureExamples[name] ?? whole;
 	});
+}
+
+/** The value as the template would resolve it: with `||`, the first alternative that is not blank. */
+function previewText(text: string, ctx: CatalogContext, selection: string): string {
+	const parts = splitAlternatives(text);
+	if (parts.length === 1) return previewPart(text, ctx, selection);
+	let result = "";
+	for (const part of parts) {
+		result = previewPart(part.trim(), ctx, selection);
+		if (result.trim() !== "") return result;
+	}
+	return result;
 }
 
 /** For the folder and the name: what the whole value becomes when this item is chosen. */
 function withResult(kind: FieldKind, text: string, result: Suggestions, ctx: CatalogContext): Suggestions {
 	if (kind !== "into" && kind !== "filename") return result;
 	const items = result.items.map((item) => {
-		const next = previewText(text.slice(0, result.from) + item.insert + text.slice(result.to), ctx);
-		if (next.includes("{{")) return item;
-		let value = next;
+		// Choosing `||` only starts the next alternative; there is nothing to show yet.
+		if (item.tag === TAG_OR) return item;
+		const next = text.slice(0, result.from) + item.insert + text.slice(result.to);
+		const selected = previewText(next, ctx, SAMPLE_SELECTION);
+		if (selected.includes("{{")) return item;
 		if (kind === "into") {
-			const path = next.startsWith("/") ? joinPath(next) : joinPath(ctx.root, next);
+			const path = selected.startsWith("/") ? joinPath(selected) : joinPath(ctx.root, selected);
 			if (path === "") return item;
-			value = `${path}/`;
+			return { ...item, example: `${path}/`, exampleLabel: RESULT_LABEL };
 		}
-		return { ...item, example: value, exampleLabel: RESULT_LABEL };
+		if (selected.trim() === "") return item;
+		let unselected = previewText(next, ctx, "");
+		// An empty name is replaced by the default one, as when the note is created.
+		if (unselected.trim() === "") unselected = previewText(DEFAULT_FILENAME, ctx, "");
+		if (unselected === selected) return { ...item, example: selected, exampleLabel: RESULT_LABEL };
+		// The name depends on the selection: told as a case, like the other examples. An item with its own case keeps it.
+		if (item.scenario !== undefined) return item;
+		return {
+			...item,
+			scenario: `you select "${SAMPLE_SELECTION}" in ${ORIGIN}, so the new note is named "${selected}". With nothing selected, it is named "${unselected}".`,
+		};
 	});
 	return { ...result, items };
+}
+
+/** What `||` does in this field, for the item that inserts it. */
+function orItem(kind: FieldKind, before: string, from: number, ctx: CatalogContext): Suggestion {
+	const typed = before.slice(from);
+	const insert = `${typed}${before.endsWith(" ") ? "" : " "}${OR_OPERATOR} `;
+	if (kind === "into") {
+		const key = ctx.propertyKeys[0] ?? "status";
+		return {
+			label: OR_OPERATOR,
+			insert,
+			tag: TAG_OR,
+			definition: "Lets you add a second folder, used when the first one is empty.",
+			scenario: `you write "{{from:${key}}} ${OR_OPERATOR} {{here}}", and a note without a "${key}" property is saved next to ${ORIGIN}.`,
+		};
+	}
+	const name = ctx.templateName ?? SAMPLE_TEMPLATE;
+	return {
+		label: OR_OPERATOR,
+		insert,
+		tag: TAG_OR,
+		definition: "Lets you add a second name, used when the first one is empty.",
+		scenario: `you write "{{selection}} ${OR_OPERATOR} ${name}", so with nothing selected the new note is named "${name}".`,
+	};
+}
+
+/** Adds the `||` item after a finished variable, where a second choice can follow. */
+function withOr(kind: FieldKind, before: string, result: Suggestions, ctx: CatalogContext): Suggestions {
+	if (!before.trimEnd().endsWith("}}")) return result;
+	return { ...result, items: [...result.items, orItem(kind, before, result.from, ctx)] };
+}
+
+/** An empty file name starts from what the template does when it is left empty. */
+function defaultNameItem(): Suggestion {
+	return {
+		label: DEFAULT_FILENAME,
+		insert: DEFAULT_FILENAME,
+		tag: "default",
+		definition: "Lets you start from the name the new note gets when this field is empty, and change it.",
+	};
+}
+
+/** A folder value is a path per alternative: the list works on the part after the last `||`. */
+function intoSuggestions(text: string, caret: number, ctx: CatalogContext): Suggestions {
+	const before = text.slice(0, caret);
+	const last = splitAlternatives(before).pop() ?? "";
+	const base = before.length - last.length + (last.length - last.trimStart().length);
+	const inner = pathSuggestions("into", text.slice(base), caret - base, ctx);
+	return { ...inner, from: inner.from + base, to: inner.to + base };
+}
+
+/** Whether position `at` of `text` begins a value: the start, or right after a `||`. */
+function startsAlternative(text: string, at: number): boolean {
+	const head = text.slice(0, at).trimEnd();
+	return head === "" || head.endsWith(OR_OPERATOR);
 }
 
 /** Suggestions for the text before `caret`; the whole option list when nothing is typed yet. */
@@ -437,7 +593,7 @@ export function suggest(kind: FieldKind, text: string, caret: number, ctx: Catal
 	if (inVariable) return withResult(kind, text, variableSuggestions(kind, text, caret, open, ctx), ctx);
 	// Obsidian lists a property's existing values itself; ours would pile on top, so only `{{` opens ours.
 	if (kind === "body" || kind === "value") return empty(caret);
-	if (kind === "into") return withResult(kind, text, pathSuggestions(kind, text, caret, ctx), ctx);
+	if (kind === "into") return withResult(kind, text, withOr(kind, before, intoSuggestions(text, caret, ctx), ctx), ctx);
 
 	const token = /[A-Za-z]*$/.exec(before)?.[0] ?? "";
 	const from = caret - token.length;
@@ -445,7 +601,8 @@ export function suggest(kind: FieldKind, text: string, caret: number, ctx: Catal
 	const items = variablesFor(kind, ctx).filter(
 		(item) => token === "" || item.label.slice(2).toLowerCase().startsWith(lower),
 	);
-	return withResult(kind, text, { from, to: caret, items }, ctx);
+	if (text === "") items.unshift(defaultNameItem());
+	return withResult(kind, text, withOr(kind, before, { from, to: caret, items }, ctx), ctx);
 }
 
 const KEY_DEFINITIONS: Record<string, string> = {
@@ -491,6 +648,7 @@ export function keyHelp(key: string, ctx: CatalogContext): Suggestion | null {
 		case KEYS.filename:
 			scenario =
 				"leave it empty, and the name is the text you selected, or the template's file name with the date and time if nothing is selected.";
+			item.also = linkLabel(ctx);
 			break;
 		case KEYS.open:
 			scenario = "unchecked, the new note is created in the background and a link to it appears where your cursor is. If no note is being edited, it opens anyway.";

@@ -93,6 +93,13 @@
 	color: var(--text-normal);
 }
 
+/* A second block about the same item, set apart from the first. */
+.scoped-templates-detail-also {
+	margin-top: var(--size-4-3);
+	padding-top: var(--size-4-3);
+	border-top: 1px solid var(--background-modifier-border);
+}
+
 /* Completion popup of the editor (only used in template files). */
 .cm-tooltip.cm-tooltip-autocomplete {
 	background-color: var(--background-primary);

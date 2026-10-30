@@ -314,3 +314,147 @@ describe("key help details", () => {
 		expect(suggest("where", "", 0, ctx()).items.find((item) => item.label === "*")?.tag).toBe("wildcard");
 	});
 });
+
+describe("the || operator and the new variables", () => {
+	const named = ctx({ templateName: "decision" });
+	const items = (kind: Parameters<typeof suggest>[0], text: string, c = named) => suggest(kind, text, text.length, c).items;
+	const find = (kind: Parameters<typeof suggest>[0], text: string, label: string, c = named) =>
+		items(kind, text, c).find((item) => item.label === label);
+
+	it("starts an empty file name from the default, written out", () => {
+		const first = items("filename", "")[0];
+		expect(first?.label).toBe("{{selection}} || {{template}}-{{date:YYMMDDHHmm}}");
+		expect(first?.insert).toBe(first?.label);
+		expect(first?.tag).toBe("default");
+		expect(items("filename", "x").some((item) => item.tag === "default")).toBe(false);
+	});
+
+	it("tells a value that depends on the selection as a case with both outcomes", () => {
+		const first = items("filename", "")[0];
+		expect(first?.scenario).toBe(
+			'you select "Meeting" in the note you run the template from, so the new note is named "Meeting". With nothing selected, it is named "decision-date:YYMMDDHHmm".',
+		);
+		expect(first?.example).toBeUndefined();
+		expect(first?.definition).toBe("Lets you start from the name the new note gets when this field is empty, and change it.");
+		// An item with its own case keeps it, and a value that does not depend on the selection keeps its result.
+		expect(find("filename", "decision-", "{{selection}}")?.scenario).toContain("appears in the new note's name");
+		expect(find("filename", "decision-", "{{date}}")?.example).toBe("decision-date:default");
+		expect(find("filename", "decision-", "{{date}}")?.scenario).toBe('a note created today gets "date:default" in its name.');
+	});
+
+	it("offers the template's file name for names only", () => {
+		const item = find("filename", "", "{{template}}");
+		expect(item?.scenario).toBe('the template file is "decision", so "decision" appears in the new note\'s name.');
+		expect(item?.example).toBe("decision");
+		expect(items("into", "").some((entry) => entry.label === "{{template}}")).toBe(false);
+		expect(items("value", "{{").some((entry) => entry.label === "{{template}}")).toBe(false);
+	});
+
+	it("offers || after a finished variable and says what it does", () => {
+		const item = find("filename", "{{selection}}", "||");
+		expect(item?.insert).toBe(" || ");
+		expect(item?.tag).toBe("or");
+		expect(item?.definition).toBe("Lets you add a second name, used when the first one is empty.");
+		expect(item?.scenario).toContain('"{{selection}} || decision"');
+		expect(find("filename", "{{selection}} ", "||")?.insert).toBe("|| ");
+		expect(find("into", "{{from:project}}", "||")?.definition).toBe("Lets you add a second folder, used when the first one is empty.");
+	});
+
+	it("builds the || example from a property of the vault, not from a fixed name", () => {
+		expect(find("into", "{{here}}", "||")?.scenario).toContain('"{{from:status}} || {{here}}"');
+		expect(find("into", "{{here}}", "||", ctx({ propertyKeys: ["kind"] }))?.scenario).toContain('{{from:kind}}');
+		expect(find("into", "{{here}}", "||", ctx({ propertyKeys: [] }))?.scenario).toContain('{{from:status}}');
+	});
+
+	it("does not offer || where nothing is finished", () => {
+		for (const text of ["", "decision", "{{selection}} || ", "{{sel"]) {
+			expect(find("filename", text, "||")).toBeUndefined();
+		}
+		expect(find("into", "", "||")).toBeUndefined();
+		expect(find("where", "{{project}}", "||")).toBeUndefined();
+		expect(find("value", "{{from:status}}", "||")).toBeUndefined();
+	});
+
+	it("keeps the typed folder text when || is offered for a path", () => {
+		expect(find("into", "x/{{from:p}}", "||")?.insert).toBe("{{from:p}} || ");
+		expect(suggest("into", "x/{{from:p}}", 12, named).from).toBe(2);
+	});
+
+	it("offers {{here}} only at the start of the folder", () => {
+		expect(items("into", "").map((item) => item.label)).toContain("{{here}}");
+		expect(items("into", "{{he").map((item) => item.label)).toEqual(["{{here}}"]);
+		expect(items("into", "/").map((item) => item.label)).not.toContain("{{here}}");
+		expect(items("into", "x/").map((item) => item.label)).not.toContain("{{here}}");
+		expect(items("into", "x/{{he").map((item) => item.label)).toEqual([]);
+		expect(items("filename", "").map((item) => item.label)).not.toContain("{{here}}");
+	});
+
+	it("explains {{here}} with the folder the template runs from", () => {
+		const item = find("into", "", "{{here}}");
+		expect(item?.definition).toContain("next to the note you run the template from");
+		expect(item?.scenario).toBe(
+			'you run the template from "project/a9-pascaline/Notes.md", so the new note is saved in "project/a9-pascaline/".',
+		);
+		expect(item?.example).toBe("project/a9-pascaline/");
+		expect(find("into", "", "{{here}}", ctx({ sampleFolder: "", root: "" }))?.scenario).toContain("the vault root");
+	});
+
+	it("tells that a name without {{selection}} turns the selection into the link label", () => {
+		const selection = find("filename", "", "{{selection}}");
+		expect(selection?.scenario).not.toContain("label");
+		expect(selection?.also?.definition).toBe(
+			"Lets the text you selected stay as the label of the link, when the name does not include {{selection}}.",
+		);
+		expect(selection?.also?.scenario).toBe(
+			'the name is "decision-{{date:YYMMDDHHmm}}" and you select "Meeting", so the note is named "decision-date:YYMMDDHHmm" and the link to it reads "Meeting".',
+		);
+		expect(selection?.also?.example).toBe("[[decision-date:YYMMDDHHmm|Meeting]]");
+		expect(find("value", "{{", "{{selection}}")?.also).toBeUndefined();
+		expect(keyHelp("tpl-filename", named)?.scenario).not.toContain("label");
+		expect(keyHelp("tpl-filename", named)?.also?.example).toBe("[[decision-date:YYMMDDHHmm|Meeting]]");
+		expect(keyHelp("tpl-filename", named)?.scenario).toContain("the template's file name");
+	});
+
+	it("previews a folder chain with the first alternative that has a value", () => {
+		const c = ctx({ propertyExample: (key) => (key === "status" ? "active" : undefined) });
+		const date = suggest("into", "{{from:status}} || ", 19, c).items.find((entry) => entry.label === "{{date}}");
+		expect(date?.example).toBe("project/active/");
+	});
+
+	it("works on the part after || and replaces only that part", () => {
+		const text = "{{from:status}} || {{he";
+		const result = suggest("into", text, text.length, named);
+		expect(result.items.map((item) => item.label)).toEqual(["{{here}}"]);
+		expect(result.from).toBe(19);
+		const next = suggest("into", "{{from:status}} || ", 19, named);
+		expect(next.from).toBe(19);
+		expect(next.items.map((item) => item.label)).toContain("/");
+		expect(next.items.map((item) => item.label)).toContain("{{here}}");
+		expect(next.items.map((item) => item.label)).toContain("a9-pascaline");
+	});
+});
+
+describe("remarks kept in their own block", () => {
+	const find = (kind: Parameters<typeof suggest>[0], text: string, label: string, c = ctx()) =>
+		suggest(kind, text, text.length, c).items.find((item) => item.label === label);
+
+	it("explains how to change the date format apart from the fixed one", () => {
+		const name = find("filename", "", "{{date:YYMMDDHHmm}}");
+		expect(name?.definition).not.toContain("To use another format");
+		expect(name?.also?.definition).toContain("by changing the letters after the colon");
+		expect(name?.also?.scenario).toBe('you write "{{date:DD.MM.YYYY}}", so a note created today gets "date:DD.MM.YYYY" in its name.');
+		const note = find("value", "{{", "{{date:YYMMDDHHmm}}");
+		expect(note?.also?.scenario).toBe('you write "{{date:DD.MM.YYYY}}", so the value becomes "date:DD.MM.YYYY".');
+		expect(find("into", "", "{{date}}")?.also).toBeUndefined();
+	});
+
+	it("explains the nearby-notes lookup of {{from:}} apart from the plain copy", () => {
+		const c = ctx({ propertyExample: (key) => (key === "status" ? "active" : undefined) });
+		const item = find("value", "{{from:", "{{from:status}}", c);
+		expect(item?.scenario).toBe(`that note's status is "active", so the value becomes "active".`);
+		expect(item?.also?.definition).toBe("Lets the value come from the notes around it when the source note has no such property.");
+		expect(item?.also?.scenario).toContain('the notes next to it all have "active"');
+		expect(find("filename", "{{from:", "{{from:status}}", c)?.also).toBeUndefined();
+		expect(find("into", "{{from:", "{{from:status}}", c)?.also).toBeUndefined();
+	});
+});

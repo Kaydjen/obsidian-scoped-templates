@@ -1,3 +1,5 @@
+import { splitAlternatives } from "./substitute";
+
 export interface BuildDeps {
 	/** Substitute variables inside a plain string value. */
 	text(value: string): string;
@@ -34,11 +36,28 @@ function wholeFrom(value: unknown): string | null {
 	return FROM_RE.exec(value)?.[1] ?? null;
 }
 
+/** The value of one text: a whole `{{from:}}` keeps its type, anything else is substituted as text. */
+function resolveText(value: string, deps: BuildDeps): unknown {
+	const key = wholeFrom(value);
+	if (key !== null) return deepClone(deps.from(key) ?? null);
+	return deps.text(value);
+}
+
+/** `a || b`: the first alternative with a value, each resolved like a value of its own. */
+function resolveAlternatives(parts: string[], deps: BuildDeps): unknown {
+	let result: unknown = null;
+	for (const part of parts) {
+		result = resolveText(part.trim(), deps);
+		const blank = typeof result === "string" ? result.trim() === "" : isEmpty(result);
+		if (!blank) return result;
+	}
+	return result;
+}
+
 function walk(value: unknown, deps: BuildDeps): unknown {
 	if (typeof value === "string") {
-		const key = wholeFrom(value);
-		if (key !== null) return deepClone(deps.from(key) ?? null);
-		return deps.text(value);
+		const parts = splitAlternatives(value);
+		return parts.length > 1 ? resolveAlternatives(parts, deps) : resolveText(value, deps);
 	}
 	if (Array.isArray(value)) {
 		const onlyKey = value.length === 1 ? wholeFrom(value[0]) : null;
