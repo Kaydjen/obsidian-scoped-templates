@@ -1,6 +1,17 @@
 import { App, SuggestModal, prepareFuzzySearch } from "obsidian";
-import { NEW_TEMPLATE_ACTION_LABEL, SEPARATED_CLASS } from "../constants";
+import { AVAILABLE_EVERYWHERE_LABEL, NEW_TEMPLATE_ACTION_LABEL, SEPARATED_CLASS } from "../constants";
 import type { VisibleTemplate } from "../core/scope";
+
+export interface PickOptions<T> {
+	/** Always shown after the filtered items. */
+	last?: T;
+	/** The first row of a second block: it gets a divider above it. */
+	blockStart?: T;
+	/** Caption of the search field; it names what the list asks for. */
+	placeholder?: string;
+	/** Muted second part of a row; searched together with the main text. */
+	aux?: (item: T) => string | undefined;
+}
 
 class ListPicker<T> extends SuggestModal<T> {
 	private settled = false;
@@ -9,31 +20,43 @@ class ListPicker<T> extends SuggestModal<T> {
 		app: App,
 		private readonly items: T[],
 		private readonly text: (item: T) => string,
-		/** Always shown after the filtered items. */
-		private readonly last: T | undefined,
-		/** The first row of a second block: it gets a divider above it. */
-		private readonly blockStart: T | undefined,
+		private readonly options: PickOptions<T>,
 		private readonly finish: (value: T | null) => void,
 	) {
 		super(app);
+		if (options.placeholder !== undefined) this.setPlaceholder(options.placeholder);
 	}
 
 	getSuggestions(query: string): T[] {
-		const tail = this.last === undefined ? [] : [this.last];
+		const { last } = this.options;
+		const tail = last === undefined ? [] : [last];
 		if (query.trim() === "") return [...this.items, ...tail];
 		const fuzzy = prepareFuzzySearch(query);
 		const matches = this.items
-			.map((item) => ({ item, result: fuzzy(this.text(item)) }))
+			.map((item) => ({ item, result: fuzzy(this.searchText(item)) }))
 			.filter((entry) => entry.result !== null)
 			.sort((a, b) => (b.result?.score ?? 0) - (a.result?.score ?? 0))
 			.map((entry) => entry.item);
 		return [...matches, ...tail];
 	}
 
+	private searchText(item: T): string {
+		const aux = this.options.aux?.(item);
+		return aux ? `${this.text(item)} ${aux}` : this.text(item);
+	}
+
 	renderSuggestion(item: T, el: HTMLElement): void {
-		el.setText(this.text(item));
+		const aux = this.options.aux?.(item);
+		if (aux) {
+			el.addClass("mod-complex");
+			el.createDiv({ cls: "suggestion-content" }).createDiv({ cls: "suggestion-title", text: this.text(item) });
+			el.createDiv({ cls: "suggestion-aux", text: aux });
+		} else {
+			el.setText(this.text(item));
+		}
 		// The trailing item is an action, not one of the choices above it.
-		if ((this.last !== undefined && item === this.last) || (this.blockStart !== undefined && item === this.blockStart)) {
+		const { last, blockStart } = this.options;
+		if ((last !== undefined && item === last) || (blockStart !== undefined && item === blockStart)) {
 			el.addClass(SEPARATED_CLASS);
 		}
 	}
@@ -56,10 +79,9 @@ export function pickFrom<T>(
 	app: App,
 	items: T[],
 	text: (item: T) => string,
-	last?: T,
-	blockStart?: T,
+	options: PickOptions<T> = {},
 ): Promise<T | null> {
-	return new Promise((resolve) => new ListPicker(app, items, text, last, blockStart, resolve).open());
+	return new Promise((resolve) => new ListPicker(app, items, text, options, resolve).open());
 }
 
 export const NEW_TEMPLATE = "new" as const;
@@ -69,10 +91,19 @@ export function pickTemplate(
 	app: App,
 	items: VisibleTemplate[],
 ): Promise<VisibleTemplate | typeof NEW_TEMPLATE | null> {
+	// Same label in different scopes: the folder tells them apart.
+	const counts = new Map<string, number>();
+	for (const { template } of items) counts.set(template.label, (counts.get(template.label) ?? 0) + 1);
 	return pickFrom<VisibleTemplate | typeof NEW_TEMPLATE>(
 		app,
 		items,
 		(item) => (item === NEW_TEMPLATE ? NEW_TEMPLATE_ACTION_LABEL : item.template.label),
-		NEW_TEMPLATE,
+		{
+			last: NEW_TEMPLATE,
+			aux: (item) => {
+				if (item === NEW_TEMPLATE || (counts.get(item.template.label) ?? 0) < 2) return undefined;
+				return item.template.root === "" ? AVAILABLE_EVERYWHERE_LABEL : item.template.root;
+			},
+		},
 	);
 }

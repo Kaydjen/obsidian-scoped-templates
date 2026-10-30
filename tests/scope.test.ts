@@ -103,3 +103,42 @@ describe("findByCommand", () => {
 		expect(findByCommand(visible, "other")).toBeUndefined();
 	});
 });
+
+describe("scope edge cases", () => {
+	it("a template at the vault root applies in every folder, including the root", () => {
+		const everywhere = make("_tpl/note.md", "");
+		expect(evaluate(everywhere, "", "_tpl")).not.toBeNull();
+		expect(evaluate(everywhere, "a/b", "_tpl")).not.toBeNull();
+		expect(evaluate(everywhere, "a/_tpl", "_tpl")).toBeNull();
+	});
+
+	it("tries every where pattern and takes the first match's captures", () => {
+		const t = make("project/_tpl/t.md", "project", { where: ["{{a}}/x", "{{b}}"] });
+		expect(evaluate(t, "project/p/x", "_tpl")?.captures).toEqual({ a: "p" });
+		expect(evaluate(t, "project/p/y", "_tpl")?.captures).toEqual({ b: "p" });
+	});
+
+	it("except wins over where", () => {
+		const t = make("project/_tpl/t.md", "project", { where: ["*"], except: ["a*"] });
+		expect(evaluate(t, "project/abc", "_tpl")).toBeNull();
+		expect(evaluate(t, "project/b", "_tpl")).not.toBeNull();
+	});
+
+	it("sorts by depth, then recent use, then label; a deeper same-named template wins", () => {
+		const root = make("_tpl/note.md", "", { label: "Note" });
+		const deep = make("project/_tpl/note.md", "project", { label: "Project note" });
+		const zeta = make("_tpl/zeta.md", "", { label: "Zeta" });
+		const alpha = make("_tpl/alpha.md", "", { label: "Alpha" });
+		const list = visibleTemplates([root, zeta, deep, alpha], "project/a", "_tpl", {});
+		expect(list.map((item) => item.template.path)).toEqual(["project/_tpl/note.md", "_tpl/alpha.md", "_tpl/zeta.md"]);
+		const used = visibleTemplates([zeta, alpha], "", "_tpl", { "_tpl/zeta.md": 5 });
+		expect(used.map((item) => item.template.label)).toEqual(["Zeta", "Alpha"]);
+	});
+
+	it("findByCommand returns the first match or nothing", () => {
+		const a = make("_tpl/a.md", "", { command: "x" });
+		const list = visibleTemplates([a], "", "_tpl", {});
+		expect(findByCommand(list, "x")?.template).toBe(a);
+		expect(findByCommand(list, "y")).toBeUndefined();
+	});
+});

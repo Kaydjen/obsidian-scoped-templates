@@ -1,4 +1,4 @@
-import { deepClone, deepEqual } from "./frontmatter";
+import { deepClone, deepEqual, isEmpty } from "./frontmatter";
 import { parentPath, splitPath } from "./paths";
 
 export interface InheritOptions {
@@ -14,16 +14,12 @@ export interface InheritOptions {
 	listFolderValues(folder: string, key: string): unknown[];
 }
 
-function isMissing(value: unknown): boolean {
-	return value === null || value === undefined || value === "" || (Array.isArray(value) && value.length === 0);
-}
-
 /**
  * source file -> neighbors in its folder -> parent folder ... up to the scope root.
  * Neighbors count only when they all agree; a conflict yields nothing rather than a guess.
  */
 export function resolveFrom(options: InheritOptions): unknown {
-	if (!isMissing(options.sourceValue)) return deepClone(options.sourceValue);
+	if (!isEmpty(options.sourceValue)) return deepClone(options.sourceValue);
 	if (!options.enabled) return undefined;
 
 	const rootDepth = splitPath(options.root).length;

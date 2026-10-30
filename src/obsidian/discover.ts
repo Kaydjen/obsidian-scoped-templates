@@ -1,7 +1,7 @@
 import { App, TFile, parseYaml } from "obsidian";
 import { parseTemplate, type ParsedTemplate } from "../core/template";
 import type { ScopeTemplate } from "../core/scope";
-import { folderPathOf } from "./host";
+import { errorMessage, folderPathOf } from "./host";
 
 export interface TemplateEntry {
 	file: TFile;
@@ -28,7 +28,7 @@ export class TemplateIndex {
 		private readonly folderName: () => string,
 	) {}
 
-	templateFiles(): TFile[] {
+	private templateFiles(): TFile[] {
 		const name = this.folderName();
 		return this.app.vault
 			.getMarkdownFiles()
@@ -70,7 +70,7 @@ export class TemplateIndex {
 			if (parsed.config.command !== undefined) scope.command = parsed.config.command;
 			result = { entry: { file, scope, parsed } };
 		} catch (error) {
-			const message = error instanceof Error ? error.message : String(error);
+			const message = errorMessage(error);
 			result = { error: message };
 			const key = `${file.path}@${file.stat.mtime}`;
 			if (!this.warned.has(key)) {

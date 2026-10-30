@@ -4,15 +4,18 @@ import { sanitizeAlias, sanitizeName, uniqueName } from "../core/filename";
 import { buildFrontmatter, serializeFrontmatter } from "../core/frontmatter";
 import { joinPath, resolveFolder } from "../core/paths";
 import { extractCursor, substitute } from "../core/substitute";
+import { chooseTemplate } from "./choose";
 import {
-	chooseTemplate,
 	currentTime,
 	errorMessage,
 	frontmatterOf,
 	getActiveContext,
 	makeFromResolver,
 	makeSubstituteDeps,
+	withLabel,
+	type ActiveContext,
 	type Host,
+	type PickedTemplate,
 } from "./host";
 import { ensureFolder } from "./folders";
 
@@ -25,11 +28,14 @@ export async function runCreate(host: Host, command?: string): Promise<void> {
 }
 
 async function create(host: Host, command?: string): Promise<void> {
-	const { app, settings } = host;
-	const context = getActiveContext(app);
+	const context = getActiveContext(host.app);
 	const picked = await chooseTemplate(host, context.folder, command);
 	if (!picked) return;
+	await withLabel(picked.entry.scope.label, () => createNote(host, context, picked));
+}
 
+async function createNote(host: Host, context: ActiveContext, picked: PickedTemplate): Promise<void> {
+	const { app, settings } = host;
 	const { entry, captures } = picked;
 	const { config } = entry.parsed;
 	const now = currentTime();

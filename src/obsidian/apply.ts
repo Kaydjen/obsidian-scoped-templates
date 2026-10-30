@@ -1,15 +1,17 @@
-import { Notice, parseYaml, stringifyYaml } from "obsidian";
+import { Notice, parseYaml, stringifyYaml, type TFile } from "obsidian";
+import { NOTICE_INVALID_FRONTMATTER, NOTICE_OPEN_NOTE_FIRST } from "../constants";
 import { applyEdits, computeApplyEdits, type ApplyEditResult } from "../core/edit";
 import { buildFrontmatter, mergeFrontmatter, serializeFrontmatter, type Frontmatter } from "../core/frontmatter";
 import { extractCursor, substitute } from "../core/substitute";
 import { splitFrontmatter } from "../core/template";
+import { chooseTemplate } from "./choose";
 import {
-	chooseTemplate,
 	currentTime,
 	errorMessage,
 	getActiveContext,
 	makeFromResolver,
 	makeSubstituteDeps,
+	withLabel,
 	type ActiveContext,
 	type Host,
 	type PickedTemplate,
@@ -29,10 +31,10 @@ function parseNoteFrontmatter(yaml: string | null): Frontmatter | null {
 	try {
 		parsed = parseYaml(yaml);
 	} catch {
-		throw new Error("This note has invalid frontmatter");
+		throw new Error(NOTICE_INVALID_FRONTMATTER);
 	}
 	if (parsed === null || parsed === undefined) return null;
-	if (typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("This note has invalid frontmatter");
+	if (typeof parsed !== "object" || Array.isArray(parsed)) throw new Error(NOTICE_INVALID_FRONTMATTER);
 	return parsed as Frontmatter;
 }
 
@@ -48,7 +50,7 @@ function compute(
 	const split = splitFrontmatter(doc);
 	const existing = parseNoteFrontmatter(split.yaml);
 	const file = context.file;
-	if (!file) throw new Error("No active note");
+	if (!file) throw new Error(NOTICE_OPEN_NOTE_FIRST);
 
 	const from = makeFromResolver(host, {
 		source: file,
@@ -87,12 +89,18 @@ async function apply(host: Host, command?: string): Promise<void> {
 	const context = getActiveContext(app);
 	const file = context.file;
 	if (!file) {
-		new Notice("No active note");
+		new Notice(NOTICE_OPEN_NOTE_FIRST);
 		return;
 	}
 	const picked = await chooseTemplate(host, context.folder, command);
 	if (!picked) return;
 
+	await withLabel(picked.entry.scope.label, () => write(host, context, file, picked));
+	await host.recordUse(picked.entry.scope.path);
+}
+
+async function write(host: Host, context: ActiveContext, file: TFile, picked: PickedTemplate): Promise<void> {
+	const { app } = host;
 	const editor = context.editor;
 	if (editor) {
 		// One transaction: a single undo step, and no race with the file on disk.
@@ -116,5 +124,4 @@ async function apply(host: Host, command?: string): Promise<void> {
 			return applyEdits(data, result.edits);
 		});
 	}
-	await host.recordUse(picked.entry.scope.path);
 }

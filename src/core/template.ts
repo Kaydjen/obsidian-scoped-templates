@@ -73,7 +73,7 @@ function asPatterns(value: unknown, key: string): Pattern[] | null {
 function extractConfig(raw: Record<string, unknown>): TemplateConfig {
 	for (const key of Object.keys(raw)) {
 		if (key.startsWith(CONFIG_PREFIX) && !KNOWN_KEYS.includes(key)) {
-			throw new Error(`Unknown key ${key}`);
+			throw new Error(`${key} is not a template key (typo?)`);
 		}
 	}
 	const into = asString(raw[KEYS.into], KEYS.into);
@@ -114,10 +114,10 @@ export function parseTemplate(text: string, parseYaml: ParseYaml): ParsedTemplat
 		try {
 			parsed = parseYaml(quoteTemplateValues(yaml));
 		} catch (error) {
-			throw new Error(`Invalid YAML: ${(error as Error).message.split("\n")[0]}`);
+			throw new Error(`Properties are broken: ${(error as Error).message.split("\n")[0]}`);
 		}
 		if (parsed === null || parsed === undefined) parsed = {};
-		if (typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Frontmatter must be a map");
+		if (typeof parsed !== "object" || Array.isArray(parsed)) throw new Error(`Properties are broken: expected "name: value" lines`);
 		raw = parsed as Record<string, unknown>;
 	}
 

@@ -4,7 +4,7 @@ import { errorMessage, getActiveContext, type Host } from "./host";
 
 class ScopeModal extends Modal {
 	constructor(
-		private readonly host: Host,
+		host: Host,
 		private readonly folder: string,
 		private readonly visible: ReturnType<typeof visibleTemplates>,
 		private readonly invalid: { path: string; error: string }[],
@@ -15,24 +15,26 @@ class ScopeModal extends Modal {
 	onOpen(): void {
 		const { contentEl } = this;
 		contentEl.empty();
-		contentEl.createEl("h3", { text: this.folder === "" ? "/" : this.folder });
+		contentEl.createEl("h3", {
+			text: this.folder === "" ? "Templates for the whole vault" : `Templates for ${this.folder}`,
+		});
 
-		if (this.visible.length > 0) {
+		if (this.visible.length === 0) contentEl.createEl("p", { text: "None here" });
+		else {
 			const list = contentEl.createEl("ul");
 			for (const { template, captures } of this.visible) {
 				const item = list.createEl("li");
 				item.createEl("strong", { text: template.label });
+				item.createEl("div", { text: template.path });
 				const values = Object.entries(captures).map(([name, value]) => `${name}=${value}`);
-				item.createEl("div", { text: [template.path, ...values].join("  ") });
+				if (values.length > 0) item.createEl("div", { text: `Folder names: ${values.join(", ")}` });
 			}
 		}
 		if (this.invalid.length > 0) {
-			contentEl.createEl("h4", { text: "Invalid" });
+			contentEl.createEl("h4", { text: "Broken" });
 			const list = contentEl.createEl("ul");
 			for (const { path, error } of this.invalid) {
-				const item = list.createEl("li");
-				item.createEl("div", { text: path });
-				item.createEl("div", { text: error });
+				list.createEl("li", { text: `${path.slice(path.lastIndexOf("/") + 1)}: ${error}` });
 			}
 		}
 	}

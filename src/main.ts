@@ -18,6 +18,7 @@ export default class ScopedTemplatesPlugin extends Plugin implements Host {
 	/** Registered per-template commands: local command id -> display name. */
 	private readonly dynamicCommands = new Map<string, string>();
 	private readonly refreshCommands = debounce(() => void this.syncCommands(), 500, true);
+	private unloaded = false;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -68,6 +69,11 @@ export default class ScopedTemplatesPlugin extends Plugin implements Host {
 		});
 	}
 
+	onunload(): void {
+		this.unloaded = true;
+		this.refreshCommands.cancel();
+	}
+
 	scheduleCommandRefresh(): void {
 		this.refreshCommands();
 	}
@@ -98,6 +104,7 @@ export default class ScopedTemplatesPlugin extends Plugin implements Host {
 	/** One create-* and one apply-* command per distinct `tpl-command` id, so each can get a hotkey. */
 	private async syncCommands(): Promise<void> {
 		const { valid } = await this.index.load();
+		if (this.unloaded) return;
 		const wanted = new Map<string, string>();
 		for (const entry of valid) {
 			const id = entry.scope.command;

@@ -51,3 +51,23 @@ describe("uniqueName", () => {
 		expect(uniqueName("note", "md", ["note.png"])).toBe("note");
 	});
 });
+
+describe("name edge cases", () => {
+	it("drops the space left at the cut", () => {
+		expect(sanitizeName(`${"a".repeat(199)} b`)).toBe("a".repeat(199));
+	});
+
+	it("removes control characters and link syntax", () => {
+		expect(sanitizeName("a\u0000b\tc[[d]]#e^f")).toBe("ab cdef");
+	});
+
+	it("is empty for names made only of forbidden characters", () => {
+		expect(sanitizeName(' ?*"<>| ')).toBe("");
+		expect(sanitizeName("...")).toBe("");
+	});
+
+	it("uniqueName compares unicode case and skips taken counters", () => {
+		expect(uniqueName("Заметка", "md", ["заметка.md", "Заметка-2.md"])).toBe("Заметка-3");
+		expect(uniqueName("a", "md", new Set<string>())).toBe("a");
+	});
+});

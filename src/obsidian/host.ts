@@ -1,12 +1,9 @@
-import { App, Editor, MarkdownView, Notice, TFile, TFolder, moment } from "obsidian";
+import { App, Editor, MarkdownView, TFile, TFolder, moment } from "obsidian";
 import type { PluginSettings } from "../constants";
 import { isEmpty, type Frontmatter } from "../core/frontmatter";
 import { resolveFrom } from "../core/inherit";
-import { findByCommand, visibleTemplates, type VisibleTemplate } from "../core/scope";
 import type { SubstituteDeps } from "../core/substitute";
 import type { TemplateEntry, TemplateIndex } from "./discover";
-import { NEW_TEMPLATE, pickTemplate } from "./picker";
-import { runNewTemplateFromPicker } from "./new-template";
 
 /** What the command flows need from the plugin. */
 export interface Host {
@@ -112,36 +109,15 @@ export function makeSubstituteDeps(
 	};
 }
 
-/** Resolves the template to use, or null after telling the user why there is none. */
-export async function chooseTemplate(host: Host, folder: string, command?: string): Promise<PickedTemplate | null> {
-	const { valid } = await host.index.load();
-	const visible = visibleTemplates(
-		valid.map((entry) => entry.scope),
-		folder,
-		host.settings.folderName,
-		host.settings.mru,
-	);
-	const byPath = new Map(valid.map((entry) => [entry.scope.path, entry]));
-	const toPicked = (item: VisibleTemplate): PickedTemplate | null => {
-		const entry = byPath.get(item.template.path);
-		return entry ? { entry, captures: item.captures } : null;
-	};
-
-	if (command !== undefined) {
-		const found = findByCommand(visible, command);
-		if (found) return toPicked(found);
-		const known = valid.find((entry) => entry.scope.command === command);
-		new Notice(`${known?.scope.label ?? command} is not available here`);
-		return null;
-	}
-	const chosen = await pickTemplate(host.app, visible);
-	if (chosen === NEW_TEMPLATE) {
-		await runNewTemplateFromPicker(host, folder);
-		return null;
-	}
-	return chosen ? toPicked(chosen) : null;
-}
-
 export function errorMessage(error: unknown): string {
 	return error instanceof Error ? error.message : String(error);
+}
+
+/** Starts the message with the template name, so a failure says which template caused it. */
+export async function withLabel<T>(label: string, run: () => Promise<T>): Promise<T> {
+	try {
+		return await run();
+	} catch (error) {
+		throw new Error(`"${label}": ${errorMessage(error)}`);
+	}
 }

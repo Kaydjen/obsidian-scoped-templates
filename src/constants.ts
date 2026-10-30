@@ -40,24 +40,30 @@ export const PANE_CLASS = "scoped-templates-pane";
 export const GROUP_START_CLASS = "scoped-templates-group-start";
 export const GROUP_FIRST_CLASS = "scoped-templates-group-first";
 export const GROUP_ATTRIBUTE = "data-scoped-group";
+/** Caption of the scenario line in the definition panel. */
+export const DETAIL_EXAMPLE_LABEL = "Example";
 export const GROUP_LABELS = { keys: "Template keys", notes: "Note properties" } as const;
 /** Set on the document body while a property name is pointed at; hides Obsidian's own tooltip. */
 export const KEY_HELP_CLASS = "scoped-templates-key-help";
 
 export const NEW_TEMPLATE_LABEL = "New template";
 /** Last row of the template list: a plus marks it as an action, not a template name. */
-export const NEW_TEMPLATE_ACTION_LABEL = `+  ${NEW_TEMPLATE_LABEL}`;
+export const NEW_TEMPLATE_ACTION_LABEL = `+ ${NEW_TEMPLATE_LABEL}`;
 /** Set on the list row that starts a new block, so the rows above stay a separate group. */
 export const SEPARATED_CLASS = "scoped-templates-separated";
-export const NEW_TEMPLATE_CHOOSE_LABEL = "New template…";
+export const NEW_TEMPLATE_CHOOSE_LABEL = "New template, choose keys…";
 /** Most note properties the choice dialog lists. */
 export const SKELETON_DIALOG_PROPERTY_LIMIT = 30;
 export const EMPTY_BASE_LABEL = "Empty template";
 /** In front of an existing template in the list of bases: choosing it makes a copy. */
 export const COPY_BASE_PREFIX = "Copy of ";
-/** Rows of the list that asks where the new template will be available. */
-export const AVAILABLE_IN_PREFIX = "Available in ";
-export const AVAILABLE_EVERYWHERE_LABEL = "Available everywhere";
+/** Muted note on a template whose label is shared with another one: the folder it works in. */
+export const AVAILABLE_EVERYWHERE_LABEL = "everywhere";
+/** Rows of the list that asks where a new template will be used. */
+export const USED_IN_PREFIX = "In ";
+export const USED_IN_SUFFIX = " and the folders inside it";
+export const USED_EVERYWHERE_LABEL = "Everywhere";
+export const USED_WHERE_CAPTION = "Where will it be used?";
 export const NEW_TEMPLATE_BASENAME = "Untitled";
 /** Share of notes in a folder that must have a property for the new template to include it. */
 export const SKELETON_KEY_THRESHOLD = 0.5;
@@ -77,7 +83,7 @@ export interface PluginSettings {
 	dateFormat: string;
 	timeFormat: string;
 	inheritFromNeighbors: boolean;
-	/** Template keys that the "New template…" dialog had checked last time. */
+	/** Template keys that the "choose keys" dialog had checked last time. */
 	templateKeys: string[];
 	/** Template path -> last used timestamp. */
 	mru: Record<string, number>;
@@ -94,3 +100,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 
 export const DEFAULT_NAME_DATE_FORMAT = "YYMMDDHHmm";
 export const MAX_NAME_LENGTH = 200;
+
+export const NOTICE_OPEN_NOTE_FIRST = "Open a note first";
+export const NOTICE_INVALID_FRONTMATTER = "This note has invalid frontmatter";
+export const NOTICE_NO_TEMPLATE_FOR_HOTKEY = "No template with this hotkey";

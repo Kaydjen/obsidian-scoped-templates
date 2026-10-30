@@ -65,3 +65,32 @@ describe("resolveFrom", () => {
 		expect(run({ "project/a9/research": [["[[a]]"]] }, { sourceValue: [] }).result).toEqual(["[[a]]"]);
 	});
 });
+
+describe("resolveFrom edge cases", () => {
+	it("treats empty strings and nulls from the source as missing", () => {
+		expect(run({ "project/a9/research": [["[[a]]"]] }, { sourceValue: "" }).result).toEqual(["[[a]]"]);
+		expect(run({ "project/a9/research": [["[[a]]"]] }, { sourceValue: null }).result).toEqual(["[[a]]"]);
+	});
+
+	it("keeps a falsy but present source value", () => {
+		expect(run({}, { sourceValue: 0 }).result).toBe(0);
+		expect(run({}, { sourceValue: false }).result).toBe(false);
+	});
+
+	it("asks only the scope folder when the source sits in it", () => {
+		expect(run({}, { folder: "project" }).asked).toEqual(["project"]);
+	});
+
+	it("returns copies, never the neighbor's own object", () => {
+		const neighbor = ["[[a]]"];
+		const result = run({ "project/a9/research": [neighbor] }).result as string[];
+		result.push("x");
+		expect(neighbor).toEqual(["[[a]]"]);
+	});
+
+	it("compares neighbor values structurally, including key order", () => {
+		const same = run({ "project/a9/research": [{ a: 1, b: [2] }, { b: [2], a: 1 }] }).result;
+		expect(same).toEqual({ a: 1, b: [2] });
+		expect(run({ "project/a9/research": [["a"], "a"] }).result).toBeUndefined();
+	});
+});

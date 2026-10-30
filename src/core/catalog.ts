@@ -45,6 +45,8 @@ export interface CatalogContext {
 	propertyKeys: string[];
 	/** File name of the template being edited, for examples. */
 	templateName?: string;
+	/** The name the template has in the list: `tpl-label` when set, else the file name. */
+	templateLabel?: string;
 	/** A real value of a property in the notes of the scope, for examples. */
 	propertyExample?(key: string): string | undefined;
 	format(kind: "date" | "time", format?: string): string;
@@ -303,7 +305,7 @@ function pathSuggestions(kind: FieldKind, text: string, caret: number, ctx: Cata
 		const item: Suggestion = {
 			label: "/",
 			insert: "/",
-			tag: "root",
+			tag: "vault",
 			definition:
 				ctx.root === ""
 					? "Lets the path start at the vault root."
@@ -344,7 +346,7 @@ function pathSuggestions(kind: FieldKind, text: string, caret: number, ctx: Cata
 		const item: Suggestion = {
 			label: `${token}*`,
 			insert: `${token}*`,
-			tag: "pattern",
+			tag: "wildcard",
 			definition:
 				token === ""
 					? hide
@@ -381,7 +383,7 @@ function pathSuggestions(kind: FieldKind, text: string, caret: number, ctx: Cata
 		const item: Suggestion = {
 			label: "_*",
 			insert: "_*",
-			tag: "pattern",
+			tag: "wildcard",
 			definition: `Lets you hide this template in every folder whose name starts with "_".`,
 		};
 		if (sample !== undefined) item.scenario = `you cannot run it from ${noteIn(joinPath(path, sample))}.`;
@@ -400,7 +402,8 @@ function pathSuggestions(kind: FieldKind, text: string, caret: number, ctx: Cata
 /** The value with every variable that has a known example replaced; others stay as written. */
 function previewText(text: string, ctx: CatalogContext): string {
 	return text.replace(/\{\{\s*([^{}]*?)\s*\}\}/g, (whole, inner: string) => {
-		const [name = "", ...rest] = inner.split(":");
+		const [rawName = "", ...rest] = inner.split(":");
+		const name = rawName.trim();
 		const format = rest.length > 0 ? rest.join(":") : undefined;
 		if (name === "date" || name === "time") return ctx.format(name, format);
 		return ctx.captureExamples[name] ?? whole;
@@ -462,7 +465,7 @@ export const keyDefinition = (key: string): string | null => KEY_DEFINITIONS[key
 export function keyHelp(key: string, ctx: CatalogContext): Suggestion | null {
 	const definition = keyDefinition(key);
 	if (definition === null) return null;
-	const item: Suggestion = { label: key, insert: "", tag: "field", definition, help: true };
+	const item: Suggestion = { label: key, insert: "", tag: "info", definition, help: true };
 	const name = ctx.templateName ?? "Decision";
 	const folder = ctx.subfolders(ctx.root)[0];
 	let scenario: string | undefined;
@@ -487,14 +490,16 @@ export function keyHelp(key: string, ctx: CatalogContext): Suggestion | null {
 			break;
 		case KEYS.filename:
 			scenario =
-				"leave it empty, and the name is the text you selected, or the template's name with the date and time if nothing is selected.";
+				"leave it empty, and the name is the text you selected, or the template's file name with the date and time if nothing is selected.";
 			break;
 		case KEYS.open:
-			scenario = "unchecked, the new note is created in the background and a link to it appears where your cursor is.";
+			scenario = "unchecked, the new note is created in the background and a link to it appears where your cursor is. If no note is being edited, it opens anyway.";
 			break;
-		case KEYS.command:
-			scenario = `write "decision" here, then assign a key to "Create: ${name}" in Obsidian's Hotkeys settings.`;
+		case KEYS.command: {
+			const label =ctx.templateLabel ?? name;
+			scenario = `write "decision" here, then assign a key to "Create: ${label}" or "Apply: ${label}" in Obsidian's Hotkeys settings.`;
 			break;
+		}
 	}
 	if (scenario !== undefined) item.scenario = scenario;
 	return item;

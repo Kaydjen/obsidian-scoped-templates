@@ -30,7 +30,7 @@ export function substitute(text: string, deps: SubstituteDeps): string {
 		switch (name) {
 			case "date":
 			case "time":
-				return deps.formatDate(name, arg === undefined || arg.trim() === "" ? undefined : arg);
+				return deps.formatDate(name, arg === undefined || arg.trim() === "" ? undefined : arg.trim());
 			case "title":
 				return deps.title === undefined ? match : deps.title;
 			case "selection":

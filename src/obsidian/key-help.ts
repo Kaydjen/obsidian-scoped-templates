@@ -1,10 +1,8 @@
 import { KEY_HELP_CLASS, PANE_CLASS } from "../constants";
 import type { Suggestion } from "../core/catalog";
-import { renderDetail } from "./field-suggest";
+import { PANE_GAP, PANE_WIDTH, renderDetail } from "./field-suggest";
 
 const SHOW_DELAY = 250;
-const PANE_GAP = 6;
-const PANE_WIDTH = 300;
 
 /** The same explanation panel as beside the option list, opened by pointing at a property's name. */
 export class KeyHelp {

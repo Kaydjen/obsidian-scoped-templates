@@ -73,6 +73,8 @@ export function buildContext(host: Host, file: TFile): CatalogContext {
 	const { app, settings } = host;
 	const root = folderPathOf(file.parent?.parent ?? null);
 	const frontmatter = app.metadataCache.getFileCache(file)?.frontmatter ?? {};
+	const rawLabel: unknown = frontmatter[KEYS.label];
+	const label = typeof rawLabel === "string" ? rawLabel.trim() : "";
 	const where = lenientPatterns(frontmatter[KEYS.where]);
 	const except = lenientPatterns(frontmatter[KEYS.except]);
 	const now = currentTime();
@@ -89,6 +91,7 @@ export function buildContext(host: Host, file: TFile): CatalogContext {
 	return {
 		root,
 		templateName: file.basename,
+		templateLabel: label === "" ? file.basename : label,
 		captures: [...captures],
 		captureExamples: example.captures,
 		...(example.folder === undefined ? {} : { sampleFolder: example.folder }),

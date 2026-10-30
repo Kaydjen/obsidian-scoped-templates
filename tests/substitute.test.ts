@@ -57,3 +57,43 @@ describe("extractCursor", () => {
 		expect(extractCursor("none")).toEqual({ text: "none", offset: null });
 	});
 });
+
+describe("substitute edge cases", () => {
+	it("reports plain-text forms for object and nested list values", () => {
+		expect(formatValue({ a: 1 })).toBe('{"a":1}');
+		expect(formatValue([["x"], null, "y"])).toBe("x, , y");
+		expect(formatValue(false)).toBe("false");
+		expect(formatValue(0)).toBe("0");
+	});
+
+	it("keeps malformed or empty braces as written", () => {
+		expect(substitute("{{}} {{ }} {{from}} {{from:", deps())).toBe("{{}} {{ }} {{from}} {{from:");
+		expect(substitute("{{{date}}}", deps())).toBe("{date(default)}");
+	});
+
+	it("ignores whitespace around names and arguments", () => {
+		expect(substitute("{{ date : YYYY }}", deps())).toBe("date(YYYY)");
+		expect(substitute("{{ from : project }}", deps())).toBe("[[a9-pascaline]]");
+		expect(substitute("{{date: }}", deps())).toBe("date(default)");
+	});
+
+	it("does not resolve inherited object keys as captures", () => {
+		expect(substitute("{{constructor}} {{toString}}", deps())).toBe("{{constructor}} {{toString}}");
+	});
+
+	it("allows an empty selection, source and title", () => {
+		expect(substitute("[{{selection}}][{{source}}]", deps({ selection: "", source: "" }))).toBe("[][]");
+		expect(substitute("a{{title}}b", deps({ title: "" }))).toBe("ab");
+	});
+});
+
+describe("extractCursor edge cases", () => {
+	it("handles a marker at the start and at the end", () => {
+		expect(extractCursor("{{cursor}}x")).toEqual({ text: "x", offset: 0 });
+		expect(extractCursor("x{{cursor}}")).toEqual({ text: "x", offset: 1 });
+	});
+
+	it("does not treat a spaced marker as a cursor", () => {
+		expect(extractCursor("a{{ cursor }}")).toEqual({ text: "a{{ cursor }}", offset: null });
+	});
+});

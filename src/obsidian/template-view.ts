@@ -88,6 +88,8 @@ export function registerTemplateView(plugin: Plugin & Host): void {
 
 	const detach = (): void => {
 		help.hide();
+		window.cancelAnimationFrame(frame);
+		frame = 0;
 		observer?.disconnect();
 		observer = null;
 		decorated?.removeClass(TEMPLATE_VIEW_CLASS);

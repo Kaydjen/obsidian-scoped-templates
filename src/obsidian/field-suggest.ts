@@ -1,12 +1,12 @@
 import { AbstractInputSuggest, type App } from "obsidian";
-import { PANE_CLASS } from "../constants";
+import { DETAIL_EXAMPLE_LABEL, PANE_CLASS } from "../constants";
 import { fieldHelp, suggest, type CatalogContext, type FieldKind, type Suggestion, type Suggestions } from "../core/catalog";
 
 /** An insertion ending like this expects more typing, so the list is reopened. */
 const CONTINUES = /[/:]$/;
 
-const PANE_GAP = 6;
-const PANE_WIDTH = 300;
+export const PANE_GAP = 6;
+export const PANE_WIDTH = 300;
 
 /** The same definition block is used beside the Properties list and in the editor's completion popup. */
 export function renderDetail(parent: HTMLElement, item: Suggestion): void {
@@ -14,7 +14,7 @@ export function renderDetail(parent: HTMLElement, item: Suggestion): void {
 	parent.createDiv({ cls: "scoped-templates-detail-text", text: item.definition });
 	if (item.scenario !== undefined && item.scenario !== "") {
 		const row = parent.createDiv({ cls: "scoped-templates-detail-scenario" });
-		row.createEl("strong", { text: "Example" });
+		row.createEl("strong", { text: DETAIL_EXAMPLE_LABEL });
 		row.createSpan({ text: `: ${item.scenario}` });
 	}
 	if (item.example !== undefined && item.example !== "") {

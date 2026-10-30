@@ -84,20 +84,49 @@ describe("parseTemplate", () => {
 	});
 
 	it("rejects invalid templates with a reason", () => {
-		expect(() => parse("---\na: [1\n---\n")).toThrow(/Invalid YAML/);
-		expect(() => parse("---\ntpl-wher: x\n---\n")).toThrow(/Unknown key tpl-wher/);
+		expect(() => parse("---\na: [1\n---\n")).toThrow(/Properties are broken/);
+		expect(() => parse("---\ntpl-wher: x\n---\n")).toThrow(/tpl-wher is not a template key/);
 		expect(() => parse("---\ntpl-open: yes please\n---\n")).toThrow(/tpl-open/);
 		expect(() => parse("---\ntpl-where: 5\n---\n")).toThrow(/tpl-where/);
-		expect(() => parse('---\ntpl-where: "{{x}}/{{x}}"\n---\n')).toThrow(/Duplicate/);
-		expect(() => parse('---\ntpl-where: "{{date}}"\n---\n')).toThrow(/Reserved/);
+		expect(() => parse('---\ntpl-where: "{{x}}/{{x}}"\n---\n')).toThrow(/used twice/);
+		expect(() => parse('---\ntpl-where: "{{date}}"\n---\n')).toThrow(/already a variable/);
 		expect(() => parse('---\ntpl-filename: "{{title}}"\n---\n')).toThrow(/title/);
 		expect(() => parse("---\ntpl-command: has space\n---\n")).toThrow(/tpl-command/);
-		expect(() => parse("---\n- a\n---\n")).toThrow(/map/);
+		expect(() => parse("---\n- a\n---\n")).toThrow(/name: value/);
 	});
 });
 
 describe("empty tpl-where", () => {
 	it("treats an empty list like a missing key", () => {
 		expect(parse("---\ntpl-where: []\n---\n").config.where).toBeNull();
+	});
+});
+
+describe("config value edge cases", () => {
+	it("rejects {{title}} in tpl-into and a non-text label", () => {
+		expect(() => parse('---\ntpl-into: "{{title}}/x"\n---\n')).toThrow(/tpl-into/);
+		expect(() => parse("---\ntpl-label: [a]\n---\n")).toThrow(/tpl-label/);
+	});
+
+	it("ignores blank label and file name, keeps a single string as one pattern", () => {
+		const config = parse('---\ntpl-label: "  "\ntpl-filename: ""\ntpl-where: a9\ntpl-except: ["x", "y"]\n---\n').config;
+		expect(config.label).toBeUndefined();
+		expect(config.filename).toBeUndefined();
+		expect(config.where).toHaveLength(1);
+		expect(config.except).toHaveLength(2);
+	});
+
+	it("names the key whose pattern is invalid", () => {
+		expect(() => parse('---\ntpl-except: ["../x"]\n---\n')).toThrow(/tpl-except: .*"\.\."/);
+		expect(() => parse("---\ntpl-where: [1]\n---\n")).toThrow(/tpl-where/);
+	});
+
+	it("treats empty frontmatter and a comment-only block as no config", () => {
+		expect(parse("---\n---\nbody").config).toEqual({ where: null, except: [], open: false });
+		expect(parse("---\n# only a comment\n---\nbody").frontmatter).toEqual({});
+	});
+
+	it("normalizes CRLF in the body", () => {
+		expect(parse("---\r\na:\r\n---\r\nx\r\ny").body).toBe("x\ny");
 	});
 });

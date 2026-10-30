@@ -212,3 +212,105 @@ describe("explanation texts", () => {
 		expect(keyHelp("status", ctx())).toBeNull();
 	});
 });
+
+describe("suggestion edge cases", () => {
+	it("gives no folder suggestions below an unknown capture or a glob", () => {
+		expect(labels("where", "{{nope}}/")).toEqual(["*", "{{folder}}"]);
+		expect(labels("where", "a*/")).toEqual(["*", "{{folder}}"]);
+	});
+
+	it("walks an absolute tpl-into from the vault root", () => {
+		expect(labels("into", "/project/")).toContain("a9-pascaline");
+		expect(suggest("into", "/project/", 9, ctx()).from).toBe(9);
+	});
+
+	it("hides the vault root item once something is typed", () => {
+		expect(labels("into", "a")).not.toContain("/");
+		expect(labels("into", "")).toContain("/");
+	});
+
+	it("filters folders case-insensitively and by substring", () => {
+		expect(labels("where", "PASC")).toContain("a9-pascaline");
+		expect(labels("into", "back")).toContain("_backlog");
+	});
+
+	it("offers the underscore pattern only for except and only while it can still match", () => {
+		expect(labels("where", "")).not.toContain("_*");
+		expect(labels("except", "_")).toContain("_*");
+		expect(labels("except", "a")).not.toContain("_*");
+	});
+
+	it("previews variables with spaces inside braces", () => {
+		const item = suggest("filename", "{{ date }}-", 11, ctx()).items.find((entry) => entry.label === "{{time}}");
+		expect(item?.example).toBe("date:default-time:default");
+	});
+
+	it("does not preview a result while a variable stays unresolved", () => {
+		const item = suggest("filename", "{{unknown}}-", 12, ctx()).items.find((entry) => entry.label === "{{date}}");
+		expect(item?.example).toBeUndefined();
+	});
+
+	it("completes after an opened brace pair in the middle of the text", () => {
+		const text = "a-{{ti}}-b";
+		const result = suggest("filename", text, 6, ctx());
+		expect(result.from).toBe(2);
+		expect(result.to).toBe(8);
+		expect(result.items.map((item) => item.label)).toEqual(["{{time}}"]);
+	});
+
+	it("offers {{from:}} with a property list and only matching keys", () => {
+		expect(labels("filename", "{{from:")).toEqual(["{{from:status}}", "{{from:links}}", "{{from:project}}"]);
+		expect(labels("filename", "{{from:LIN")).toEqual(["{{from:links}}"]);
+		expect(labels("filename", "{{from:zzz")).toEqual([]);
+	});
+
+	it("filters date formats and drops time formats for folders", () => {
+		expect(labels("filename", "{{time:")).toEqual(["{{time:HH:mm}}", "{{time:HH:mm:ss}}", "{{time:HHmm}}"]);
+		expect(labels("filename", "{{date:YYMM")).toEqual(["{{date:YYMMDDHHmm}}"]);
+		expect(labels("into", "{{date:").some((label) => label.slice(2).includes(":HH:"))).toBe(false);
+	});
+
+	it("describes the date items for the place where they are used", () => {
+		const find = (kind: Parameters<typeof suggest>[0], text: string, label: string) =>
+			suggest(kind, text, text.length, ctx()).items.find((item) => item.label === label);
+		expect(find("into", "", "{{date}}")?.scenario).toBe('a note created today is saved in "date:default/".');
+		expect(find("filename", "", "{{date:YYMMDDHHmm}}")?.scenario).toBe('a note created now gets "date:YYMMDDHHmm" in its name.');
+		expect(find("value", "{{", "{{time}}")?.scenario).toBe('the value becomes "time:default".');
+	});
+
+	it("names the key help for a root template and without a sample folder", () => {
+		const root = ctx({ root: "", subfolders: () => [] });
+		expect(keyHelp("tpl-where", root)?.scenario).toBe("leave it empty, and you can run it from any folder.");
+		expect(keyHelp("tpl-except", root)?.scenario).toBeUndefined();
+		expect(keyHelp("tpl-label", ctx())?.scenario).toContain('"Decision"');
+	});
+
+	it("explains the vault root item according to the scope", () => {
+		const rootItem = (c: CatalogContext) => suggest("into", "", 0, c).items[0];
+		expect(rootItem(ctx())?.definition).toContain('"project"');
+		expect(rootItem(ctx())?.scenario).toBe('"/project" saves the new note in "project/" of the vault.');
+		expect(rootItem(ctx({ root: "" }))?.definition).toBe("Lets the path start at the vault root.");
+		expect(rootItem(ctx({ root: "" }))?.scenario).toBeUndefined();
+	});
+});
+
+describe("key help details", () => {
+	it("names both commands after the effective label, falling back to the file name", () => {
+		const text = (c: CatalogContext) => keyHelp("tpl-command", c)?.scenario;
+		expect(text(ctx({ templateName: "decision-file", templateLabel: "Decision" }))).toBe(
+			`write "decision" here, then assign a key to "Create: Decision" or "Apply: Decision" in Obsidian's Hotkeys settings.`,
+		);
+		expect(text(ctx({ templateName: "file" }))).toContain('"Create: file" or "Apply: file"');
+	});
+
+	it("says what open does without an editor and which name the default uses", () => {
+		expect(keyHelp("tpl-open", ctx())?.scenario).toContain("If no note is being edited, it opens anyway.");
+		expect(keyHelp("tpl-filename", ctx())?.scenario).toContain("the template's file name");
+	});
+
+	it("uses plain tags", () => {
+		expect(keyHelp("tpl-into", ctx())?.tag).toBe("info");
+		expect(suggest("into", "", 0, ctx()).items[0]?.tag).toBe("vault");
+		expect(suggest("where", "", 0, ctx()).items.find((item) => item.label === "*")?.tag).toBe("wildcard");
+	});
+});

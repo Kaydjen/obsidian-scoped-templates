@@ -1,5 +1,5 @@
 import { Modal, Setting, type App } from "obsidian";
-import { GROUP_LABELS } from "../constants";
+import { GROUP_LABELS, NEW_TEMPLATE_LABEL } from "../constants";
 import { keyDefinition } from "../core/catalog";
 
 export interface SkeletonChoice {
@@ -31,6 +31,7 @@ class SkeletonDialog extends Modal {
 
 	onOpen(): void {
 		const { contentEl, options } = this;
+		this.titleEl.setText(NEW_TEMPLATE_LABEL);
 		const keys = new Set(options.checkedKeys);
 		const properties = new Set(options.checkedProperties);
 
@@ -59,7 +60,7 @@ class SkeletonDialog extends Modal {
 			.addButton((button) => button.setButtonText("Cancel").onClick(() => this.close()))
 			.addButton((button) =>
 				button
-					.setButtonText("Create")
+					.setButtonText("Create template")
 					.setCta()
 					.onClick(() => {
 						this.done = true;

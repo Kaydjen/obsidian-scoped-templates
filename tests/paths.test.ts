@@ -69,3 +69,52 @@ describe("folderAndAncestors / templateFolderFor", () => {
 		expect(templateFolderFor("project/_tpl/img", "_tpl")).toBeNull();
 	});
 });
+
+describe("resolveFolder edge cases", () => {
+	it("reads backslashes as separators, including a leading one", () => {
+		expect(resolveFolder("a\\b", "project", "", "_tpl")).toBe("project/a/b");
+		expect(resolveFolder("\\inbox", "project", "", "_tpl")).toBe("inbox");
+	});
+
+	it("ignores blank segments, extra slashes and surrounding spaces", () => {
+		expect(resolveFolder(" a / / b/ ", "project", "", "_tpl")).toBe("project/a/b");
+		expect(resolveFolder("/a/ /b", "project", "", "_tpl")).toBe("a/b");
+	});
+
+	it("an empty value means the scope root, a lone slash the vault root", () => {
+		expect(resolveFolder("", "project", "x", "_tpl")).toBe("project");
+		expect(resolveFolder("/", "project", "x", "_tpl")).toBe("");
+	});
+
+	it("rejects a dot segment", () => {
+		expect(() => resolveFolder("a/./b", "", "", "_tpl")).toThrow(/"\."/);
+	});
+});
+
+describe("path helpers on odd input", () => {
+	it("handles the root and trailing slashes", () => {
+		expect(parentPath("")).toBe("");
+		expect(parentPath("a/b/")).toBe("a");
+		expect(isInside("project/", "project/")).toBe(true);
+		expect(isInside("", "project")).toBe(false);
+		expect(folderAndAncestors("/a/b/")).toEqual(["a/b", "a", ""]);
+	});
+
+	it("is case-sensitive for containment", () => {
+		expect(isInside("Project/a", "project")).toBe(false);
+	});
+
+	it("finds the template folder only for an exact name", () => {
+		expect(templateFolderFor("a/_tpl_x", "_tpl")).toBe("a/_tpl_x/_tpl");
+		expect(templateFolderFor("_tpl", "_tpl")).toBe("_tpl");
+		expect(templateFolderFor("/a/", "_tpl")).toBe("a/_tpl");
+	});
+});
+
+describe("resolveFolder messages", () => {
+	it("names the variable and the template folder", () => {
+		expect(() => resolveFolder("{{nope}}/x", "project", "", "_tpl")).toThrow("{{nope}} has no value here");
+		expect(() => resolveFolder("a/{{broken", "", "", "_tpl")).toThrow(/has no value here/);
+		expect(() => resolveFolder("a/_tpl", "project", "", "_tpl")).toThrow('tpl-into cannot point into a "_tpl" folder');
+	});
+});

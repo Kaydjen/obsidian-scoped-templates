@@ -38,18 +38,24 @@ export function resolveFolder(
 	templateFolderName: string,
 ): string {
 	if (into === undefined) return joinPath(context);
-	if (into.includes("{{")) throw new Error(`Unresolved variable in folder: ${into}`);
-	const absolute = into.trim().startsWith("/");
-	const segments = splitPath(into.trim().replace(/\\/g, "/")).map((s) => s.trim());
+	if (into.includes("{{")) {
+		const variable = /\{\{[^{}]*\}\}/.exec(into)?.[0] ?? "{{";
+		throw new Error(`${variable} has no value here (it is not defined in tpl-where)`);
+	}
+	const normalized = into.trim().replace(/\\/g, "/");
+	const absolute = normalized.startsWith("/");
+	const segments = splitPath(normalized)
+		.map((s) => s.trim())
+		.filter((s) => s.length > 0);
 	for (const segment of segments) {
 		if (segment === ".." || segment === ".") {
-			throw new Error(`Folder must not contain "${segment}": ${into}`);
+			throw new Error(`tpl-into cannot contain "${segment}": ${into}`);
 		}
 		if (segment === templateFolderName) {
-			throw new Error(`Folder must not be inside ${templateFolderName}: ${into}`);
+			throw new Error(`tpl-into cannot point into a "${templateFolderName}" folder: ${into}`);
 		}
 	}
-	return absolute ? segments.join("/") : joinPath(root, segments.join("/"));
+	return absolute ? segments.join("/") : joinPath(root, ...segments);
 }
 
 /** `folder`, its parent, and so on up to the vault root (the empty string). */

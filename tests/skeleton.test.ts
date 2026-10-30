@@ -55,3 +55,35 @@ describe("buildSkeleton with chosen keys", () => {
 		expect(buildSkeleton([], {}, [])).toBe("---\n---\n");
 	});
 });
+
+describe("skeleton edge cases", () => {
+	it("quotes property names that are not plain words", () => {
+		const text = buildSkeleton(["due date", "a:b", "ok-key_1"], {});
+		expect(text).toContain('\n"due date":\n');
+		expect(text).toContain('\n"a:b":\n');
+		expect(text).toContain("\nok-key_1:\n");
+		const parsed = parseTemplate(text, (yaml) => YAML.parse(yaml));
+		expect(Object.keys(parsed.frontmatter)).toEqual(["due date", "a:b", "ok-key_1"]);
+	});
+
+	it("ignores unknown config keys and unknown property types", () => {
+		expect(buildSkeleton(["n"], { n: "number" }, ["tpl-open", "tpl-bogus"])).toBe("---\ntpl-open: false\nn:\n---\n");
+	});
+
+	it("writes a date property with a value that parses back unchanged", () => {
+		const parsed = parseTemplate(buildSkeleton(["d"], { d: "date" }), (yaml) => YAML.parse(yaml));
+		expect(parsed.frontmatter["d"]).toBe("{{date:YYYY-MM-DD}}");
+	});
+});
+
+describe("commonKeys edge cases", () => {
+	it("counts a key once per note and respects the limit", () => {
+		expect(commonKeys([["a", "a", "a"], ["b"]], 1, "tpl-")).toEqual([]);
+		expect(commonKeys([["a", "b", "c"]], 0.5, "tpl-", 2)).toEqual(["a", "b"]);
+	});
+
+	it("keeps first-seen order on ties and always needs at least one note", () => {
+		expect(commonKeys([["b", "a"], ["a", "b"]], 0, "tpl-")).toEqual(["b", "a"]);
+		expect(commonKeys([["a"], []], 0, "tpl-")).toEqual(["a"]);
+	});
+});

@@ -1,7 +1,5 @@
 import { Notice, TFile } from "obsidian";
 import {
-	AVAILABLE_EVERYWHERE_LABEL,
-	AVAILABLE_IN_PREFIX,
 	COPY_BASE_PREFIX,
 	CONFIG_PREFIX,
 	EMPTY_BASE_LABEL,
@@ -9,6 +7,10 @@ import {
 	NEW_TEMPLATE_BASENAME,
 	SKELETON_DIALOG_PROPERTY_LIMIT,
 	SKELETON_KEY_THRESHOLD,
+	USED_EVERYWHERE_LABEL,
+	USED_IN_PREFIX,
+	USED_IN_SUFFIX,
+	USED_WHERE_CAPTION,
 } from "../constants";
 import { uniqueName } from "../core/filename";
 import { folderAndAncestors, isInside, joinPath, parentPath, splitPath, templateFolderFor } from "../core/paths";
@@ -21,8 +23,8 @@ import { chooseSkeleton } from "./skeleton-dialog";
 
 type Base = TemplateEntry | "empty";
 
-const availabilityLabel = (folder: string) =>
-	folder === "" ? AVAILABLE_EVERYWHERE_LABEL : `${AVAILABLE_IN_PREFIX}${folder}`;
+const usedInLabel = (folder: string) =>
+	folder === "" ? USED_EVERYWHERE_LABEL : `${USED_IN_PREFIX}${folder}${USED_IN_SUFFIX}`;
 
 /** Property types the user assigned in Obsidian (`types.json`); empty when unavailable. */
 async function readPropertyTypes(host: Host): Promise<Record<string, string>> {
@@ -68,15 +70,12 @@ async function chooseBase(host: Host, scope: string): Promise<Base | null> {
 	return pickFrom<Base>(
 		host.app,
 		["empty", ...templates],
-		(item) =>
-			item === "empty"
-				? EMPTY_BASE_LABEL
-				: item.scope.root === ""
-					? `${COPY_BASE_PREFIX}"${item.scope.label}"`
-					: `${COPY_BASE_PREFIX}"${item.scope.label}"  ·  ${item.scope.root}`,
-		undefined,
-		// The copies are a block of their own, apart from the empty template.
-		templates[0],
+		(item) => (item === "empty" ? EMPTY_BASE_LABEL : `${COPY_BASE_PREFIX}"${item.scope.label}"`),
+		{
+			// The copies are a block of their own, apart from the empty template.
+			blockStart: templates[0],
+			aux: (item) => (item === "empty" || item.scope.root === "" ? undefined : item.scope.root),
+		},
 	);
 }
 
@@ -144,7 +143,7 @@ export async function runNewTemplateFromPicker(host: Host, folder: string): Prom
 	const chosen =
 		choices.length <= 1
 			? (choices[0] ?? "")
-			: await pickFrom(host.app, choices, availabilityLabel);
+			: await pickFrom(host.app, choices, usedInLabel, { placeholder: USED_WHERE_CAPTION });
 	if (chosen === null) return;
 	await runNewTemplate(host, chosen);
 }
