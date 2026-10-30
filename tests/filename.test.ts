@@ -1,0 +1,53 @@
+import { describe, expect, it } from "vitest";
+import { sanitizeAlias, sanitizeName, uniqueName } from "../src/core/filename";
+
+describe("sanitizeName", () => {
+	it("removes characters Obsidian and Windows reject", () => {
+		expect(sanitizeName('a/b\\c:d*e?f"g<h>i|j#k^l[m]n')).toBe("abcdefghijklmn");
+	});
+
+	it("collapses whitespace and trims", () => {
+		expect(sanitizeName("  Choose   a\nTelegram  bot  ")).toBe("Choose a Telegram bot");
+	});
+
+	it("strips trailing dots and spaces", () => {
+		expect(sanitizeName("name. . ")).toBe("name");
+	});
+
+	it("cuts long names", () => {
+		expect(sanitizeName("x".repeat(500))).toHaveLength(200);
+	});
+
+	it("can end up empty", () => {
+		expect(sanitizeName("???")).toBe("");
+	});
+
+	it("keeps cyrillic and digits", () => {
+		expect(sanitizeName("Решение 2610291420")).toBe("Решение 2610291420");
+	});
+});
+
+describe("sanitizeAlias", () => {
+	it("removes link-breaking characters", () => {
+		expect(sanitizeAlias("a | [b]\nc")).toBe("a b c");
+	});
+});
+
+describe("uniqueName", () => {
+	it("returns the base when free", () => {
+		expect(uniqueName("note", "md", ["other.md"])).toBe("note");
+	});
+
+	it("appends -2, -3 on collisions", () => {
+		expect(uniqueName("note", "md", ["note.md"])).toBe("note-2");
+		expect(uniqueName("note", "md", ["note.md", "note-2.md"])).toBe("note-3");
+	});
+
+	it("compares case-insensitively", () => {
+		expect(uniqueName("Decision", "md", ["decision.md"])).toBe("Decision-2");
+	});
+
+	it("ignores other extensions", () => {
+		expect(uniqueName("note", "md", ["note.png"])).toBe("note");
+	});
+});

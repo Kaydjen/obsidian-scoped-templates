@@ -1,0 +1,122 @@
+/* Obsidian styles the empty placeholder of text properties itself; list inputs need this. */
+.multi-select-input.scoped-templates-ghost:empty::before {
+	content: attr(placeholder);
+	color: var(--text-faint);
+}
+
+/* Template files only: template keys and the note's own properties are told apart by a caption. */
+.scoped-templates-view .metadata-property {
+	position: relative;
+}
+
+.scoped-templates-view .scoped-templates-group-start {
+	margin-top: var(--size-4-8);
+}
+
+.scoped-templates-view .scoped-templates-group-first {
+	margin-top: var(--size-4-6);
+}
+
+.scoped-templates-view .scoped-templates-group-start::before {
+	content: attr(data-scoped-group);
+	position: absolute;
+	top: calc(-1 * var(--size-4-6));
+	left: var(--size-4-2);
+	color: var(--text-faint);
+	font-size: var(--font-smaller);
+	font-weight: var(--font-semibold);
+}
+
+/* Template files only: a {{variable}} in a typed property (e.g. a date) is not a type error. */
+.scoped-templates-view .metadata-property-warning-icon {
+	display: none;
+}
+
+.scoped-templates-view .scoped-templates-var {
+	font-family: var(--font-monospace);
+	font-size: var(--font-smaller);
+}
+
+/* Definition panel beside the suggestion list. */
+.scoped-templates-pane,
+.scoped-templates-detail {
+	padding: var(--size-4-2) var(--size-4-3);
+	background-color: var(--background-primary);
+	color: var(--text-normal);
+	font-size: var(--font-ui-small);
+}
+
+.scoped-templates-pane {
+	position: fixed;
+	z-index: var(--layer-popover);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-s);
+	pointer-events: none;
+}
+
+/* Pointing at a property name opens our panel; Obsidian's tooltip with the same name would cover it. */
+.scoped-templates-key-help > .tooltip {
+	display: none;
+}
+
+.scoped-templates-pane.is-hidden {
+	display: none;
+}
+
+.scoped-templates-detail-title {
+	font-family: var(--font-monospace);
+	font-weight: var(--font-semibold);
+	margin-bottom: var(--size-2-2);
+}
+
+.scoped-templates-detail-text {
+	color: var(--text-muted);
+}
+
+.scoped-templates-detail-scenario {
+	margin-top: var(--size-4-2);
+	color: var(--text-muted);
+}
+
+.scoped-templates-detail-scenario strong {
+	color: var(--text-normal);
+	font-weight: var(--font-semibold);
+}
+
+.scoped-templates-detail-example {
+	margin-top: var(--size-4-2);
+	color: var(--text-faint);
+}
+
+.scoped-templates-detail-example code {
+	color: var(--text-normal);
+}
+
+/* Completion popup of the editor (only used in template files). */
+.cm-tooltip.cm-tooltip-autocomplete {
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-s);
+}
+
+.cm-tooltip-autocomplete ul li[aria-selected] {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.cm-tooltip.cm-completionInfo {
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	box-shadow: var(--shadow-s);
+	max-width: 300px;
+	padding: 0;
+}
+
+/* A row that starts its own block (the "New template" action, the copies) gets a divider above it. */
+.suggestion-item.scoped-templates-separated:not(:first-child) {
+	margin-top: var(--size-4-2);
+	border-top: 1px solid var(--background-modifier-border);
+	border-radius: 0 0 var(--radius-s) var(--radius-s);
+}

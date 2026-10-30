@@ -1,0 +1,9 @@
+{
+	"id": "scoped-templates",
+	"name": "Scoped Templates",
+	"version": "0.1.0",
+	"minAppVersion": "1.5.0",
+	"description": "Templates that live in _tpl folders and appear only where they apply. Create linked notes or apply a template to the current note.",
+	"author": "Kaydjen",
+	"isDesktopOnly": false
+}
