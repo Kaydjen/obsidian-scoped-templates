@@ -120,3 +120,19 @@
 	border-top: 1px solid var(--background-modifier-border);
 	border-radius: 0 0 var(--radius-s) var(--radius-s);
 }
+
+/* "All" switch in the property group heading: muted until it is on. */
+.setting-item-heading button.is-active {
+	background-color: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.setting-item-heading button:not(.is-active) {
+	color: var(--text-muted);
+	box-shadow: none;
+}
+
+/* A property the user hid, shown dimmed while the hidden ones are revealed. */
+.setting-item.scoped-templates-hidden-row {
+	opacity: 0.5;
+}

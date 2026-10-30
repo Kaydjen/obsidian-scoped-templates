@@ -92,20 +92,27 @@ async function createIn(host: Host, picked: string, choose: boolean): Promise<vo
 		content = await app.vault.read(base.file);
 	} else {
 		const notes = notePropertyKeys(host, scope);
-		const usual = commonKeys(notes, SKELETON_KEY_THRESHOLD, CONFIG_PREFIX);
+		const hidden = new Set(settings.hiddenProperties);
+		const usual = commonKeys(notes, SKELETON_KEY_THRESHOLD, CONFIG_PREFIX).filter((name) => !hidden.has(name));
+		const inScope = commonKeys(notes, 0, CONFIG_PREFIX, SKELETON_DIALOG_PROPERTY_LIMIT);
 		let keys: readonly string[] = KNOWN_KEYS;
 		let properties = usual;
 		if (choose) {
 			const choice = await chooseSkeleton(app, {
 				keys: KNOWN_KEYS,
 				checkedKeys: settings.templateKeys,
-				properties: commonKeys(notes, 0, CONFIG_PREFIX, SKELETON_DIALOG_PROPERTY_LIMIT),
+				properties: inScope,
+				otherProperties: commonKeys(notePropertyKeys(host, ""), 0, CONFIG_PREFIX, Infinity).filter(
+					(name) => !inScope.includes(name),
+				),
 				checkedProperties: usual,
+				hiddenProperties: settings.hiddenProperties,
 			});
 			if (choice === null) return;
 			keys = choice.keys;
 			properties = choice.properties;
 			settings.templateKeys = choice.keys;
+			settings.hiddenProperties = choice.hidden;
 			await host.saveSettings();
 		}
 		content = buildSkeleton(properties, await readPropertyTypes(host), keys);

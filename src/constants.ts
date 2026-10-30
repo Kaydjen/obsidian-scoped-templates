@@ -85,6 +85,8 @@ export interface PluginSettings {
 	inheritFromNeighbors: boolean;
 	/** Template keys that the "choose keys" dialog had checked last time. */
 	templateKeys: string[];
+	/** Note properties the user hid from the "choose keys" dialog and from new templates. */
+	hiddenProperties: string[];
 	/** Template path -> last used timestamp. */
 	mru: Record<string, number>;
 }
@@ -95,6 +97,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	timeFormat: "HH:mm",
 	inheritFromNeighbors: true,
 	templateKeys: [...KNOWN_KEYS],
+	hiddenProperties: [],
 	mru: {},
 };
 

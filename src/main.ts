@@ -12,7 +12,7 @@ import { registerTemplateView } from "./obsidian/template-view";
 import { ScopedTemplatesSettingTab } from "./settings";
 
 export default class ScopedTemplatesPlugin extends Plugin implements Host {
-	settings: PluginSettings = { ...DEFAULT_SETTINGS, templateKeys: [...DEFAULT_SETTINGS.templateKeys], mru: {} };
+	settings: PluginSettings = { ...DEFAULT_SETTINGS, templateKeys: [...DEFAULT_SETTINGS.templateKeys], hiddenProperties: [], mru: {} };
 	index!: TemplateIndex;
 
 	/** Registered per-template commands: local command id -> display name. */
@@ -84,6 +84,7 @@ export default class ScopedTemplatesPlugin extends Plugin implements Host {
 			...DEFAULT_SETTINGS,
 			...saved,
 			templateKeys: [...(saved.templateKeys ?? DEFAULT_SETTINGS.templateKeys)],
+			hiddenProperties: [...(saved.hiddenProperties ?? [])],
 			mru: { ...(saved.mru ?? {}) },
 		};
 	}
