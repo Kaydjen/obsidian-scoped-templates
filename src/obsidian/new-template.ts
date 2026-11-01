@@ -8,8 +8,7 @@ import {
 	SKELETON_DIALOG_PROPERTY_LIMIT,
 	SKELETON_KEY_THRESHOLD,
 	USED_EVERYWHERE_LABEL,
-	USED_IN_PREFIX,
-	USED_IN_SUFFIX,
+	USED_INSIDE_LABEL,
 	USED_WHERE_CAPTION,
 } from "../constants";
 import { uniqueName } from "../core/filename";
@@ -23,8 +22,7 @@ import { chooseSkeleton } from "./skeleton-dialog";
 
 type Base = TemplateEntry | "empty";
 
-const usedInLabel = (folder: string) =>
-	folder === "" ? USED_EVERYWHERE_LABEL : `${USED_IN_PREFIX}${folder}${USED_IN_SUFFIX}`;
+const usedInLabel = (folder: string) => (folder === "" ? USED_EVERYWHERE_LABEL : folder);
 
 /** Property types the user assigned in Obsidian (`types.json`); empty when unavailable. */
 async function readPropertyTypes(host: Host): Promise<Record<string, string>> {
@@ -143,14 +141,17 @@ export async function runNewTemplate(host: Host, folder: string, choose = false)
 }
 
 /** Entry point from the template picker: asks which of the active folder's ancestors gets the template. */
-export async function runNewTemplateFromPicker(host: Host, folder: string): Promise<void> {
+export async function runNewTemplateFromPicker(host: Host, folder: string, choose = false): Promise<void> {
 	const choices = folderAndAncestors(folder).filter(
 		(candidate) => !splitPath(candidate).includes(host.settings.folderName),
 	);
 	const chosen =
 		choices.length <= 1
 			? (choices[0] ?? "")
-			: await pickFrom(host.app, choices, usedInLabel, { placeholder: USED_WHERE_CAPTION });
+			: await pickFrom(host.app, choices, usedInLabel, {
+				placeholder: USED_WHERE_CAPTION,
+				aux: (candidate) => (candidate === "" ? undefined : USED_INSIDE_LABEL),
+			});
 	if (chosen === null) return;
-	await runNewTemplate(host, chosen);
+	await runNewTemplate(host, chosen, choose);
 }

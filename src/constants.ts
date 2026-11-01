@@ -55,6 +55,7 @@ export const NEW_TEMPLATE_ACTION_LABEL = `+ ${NEW_TEMPLATE_LABEL}`;
 /** Set on the list row that starts a new block, so the rows above stay a separate group. */
 export const SEPARATED_CLASS = "scoped-templates-separated";
 export const NEW_TEMPLATE_CHOOSE_LABEL = "New template, choose keys…";
+export const NEW_TEMPLATE_CHOOSE_ACTION_LABEL = `+ ${NEW_TEMPLATE_CHOOSE_LABEL}`;
 /** Most note properties the choice dialog lists. */
 export const SKELETON_DIALOG_PROPERTY_LIMIT = 30;
 export const EMPTY_BASE_LABEL = "Empty template";
@@ -63,8 +64,8 @@ export const COPY_BASE_PREFIX = "Copy of ";
 /** Muted note on a template whose label is shared with another one: the folder it works in. */
 export const AVAILABLE_EVERYWHERE_LABEL = "everywhere";
 /** Rows of the list that asks where a new template will be used. */
-export const USED_IN_PREFIX = "In ";
-export const USED_IN_SUFFIX = " and the folders inside it";
+/** Muted second line under a folder path: the template also works in the folders below it. */
+export const USED_INSIDE_LABEL = "and the folders inside it";
 export const USED_EVERYWHERE_LABEL = "Everywhere";
 export const USED_WHERE_CAPTION = "Where will it be used?";
 export const NEW_TEMPLATE_BASENAME = "Untitled";
