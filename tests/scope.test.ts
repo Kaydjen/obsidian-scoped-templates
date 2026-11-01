@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parsePattern } from "../src/core/pattern";
-import { evaluate, findByCommand, visibleTemplates, type ScopeTemplate } from "../src/core/scope";
+import { evaluate, findByCommand, nearestTemplate, rankTemplates, visibleTemplates, type ScopeTemplate } from "../src/core/scope";
 
 const make = (path: string, root: string, options: { where?: string[]; except?: string[]; command?: string; label?: string } = {}): ScopeTemplate => {
 	const basename = path.split("/").pop()!.replace(/\.md$/, "");
@@ -140,5 +140,51 @@ describe("scope edge cases", () => {
 		const list = visibleTemplates([a], "", "_tpl", {});
 		expect(findByCommand(list, "x")?.template).toBe(a);
 		expect(findByCommand(list, "y")).toBeUndefined();
+	});
+});
+
+describe("nearestTemplate", () => {
+	const wrap = (scope: ScopeTemplate) => ({ scope });
+	const root = wrap(make("_tpl/r.md", ""));
+	const project = wrap(make("project/_tpl/p.md", "project"));
+	const b6 = wrap(make("project/b6/_tpl/note.md", "project/b6"));
+	const b6other = wrap(make("project/b6/_tpl/decision.md", "project/b6"));
+	const deepB6 = wrap(make("project/b6/x/y/_tpl/d.md", "project/b6/x/y"));
+
+	it("is undefined without templates", () => {
+		expect(nearestTemplate([], "project/b7", {})).toBeUndefined();
+	});
+
+	it("prefers the deepest template whose scope contains the folder", () => {
+		expect(nearestTemplate([root, project, b6], "project/b6/sub", {})).toBe(b6);
+		expect(nearestTemplate([root, b6, project], "project/b7", {})).toBe(project);
+	});
+
+	it("a containing scope beats a closer one that does not contain the folder", () => {
+		expect(nearestTemplate([deepB6, root], "project/b6/x/z", {})).toBe(root);
+	});
+
+	it("otherwise takes the longest shared prefix, then the shallower root", () => {
+		expect(nearestTemplate([b6], "project/b7", {})).toBe(b6);
+		expect(nearestTemplate([deepB6, b6], "project/b6/q/w", {})).toBe(b6);
+		expect(nearestTemplate([deepB6, b6], "project/b8", {})).toBe(b6);
+	});
+
+	it("breaks ties by most recent use, then by label", () => {
+		expect(nearestTemplate([b6, b6other], "project/b6", { [b6other.scope.path]: 5 })).toBe(b6other);
+		expect(nearestTemplate([b6, b6other], "project/b6", {})).toBe(b6other);
+	});
+});
+
+describe("rankTemplates", () => {
+	const wrap = (scope: ScopeTemplate) => ({ scope });
+	const root = wrap(make("_tpl/r.md", ""));
+	const project = wrap(make("project/_tpl/p.md", "project"));
+	const b6 = wrap(make("project/b6/_tpl/note.md", "project/b6"));
+	const b5 = wrap(make("project/b5/_tpl/note.md", "project/b5", { label: "a" }));
+
+	it("lists the containing scopes deepest first, then the others by closeness", () => {
+		expect(rankTemplates([root, b6, project, b5], "project/b7", {})).toEqual([project, root, b5, b6]);
+		expect(rankTemplates([], "x", {})).toEqual([]);
 	});
 });

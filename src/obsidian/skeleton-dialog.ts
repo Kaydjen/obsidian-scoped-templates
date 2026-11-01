@@ -1,6 +1,7 @@
 import { Modal, Setting, type App } from "obsidian";
-import { GROUP_LABELS, NEW_TEMPLATE_LABEL } from "../constants";
+import { FROM_SOURCE_LABEL, GROUP_LABELS, NEW_TEMPLATE_LABEL, NO_SOURCE_LABEL } from "../constants";
 import { keyDefinition } from "../core/catalog";
+import { pickFrom } from "./picker";
 
 const ACTIVE_CLASS = "is-active";
 const HIDDEN_ROW_CLASS = "scoped-templates-hidden-row";
@@ -13,6 +14,16 @@ export interface SkeletonChoice {
 	properties: string[];
 	/** Note properties the user keeps out of the list. */
 	hidden: string[];
+	/** Index in `SkeletonOptions.sources` of the source the user took properties from; null: none. */
+	source: number | null;
+}
+
+/** Something the note properties can be taken from: a template, or the most common properties of notes. */
+export interface SkeletonSource {
+	label: string;
+	/** Muted second part of the row. */
+	aux?: string;
+	properties: string[];
 }
 
 export interface SkeletonOptions {
@@ -27,6 +38,8 @@ export interface SkeletonOptions {
 	checkedProperties: readonly string[];
 	/** Properties the user hid earlier. */
 	hiddenProperties: readonly string[];
+	/** Sources of note properties, closest first; none: no button. */
+	sources?: SkeletonSource[];
 }
 
 class SkeletonDialog extends Modal {
@@ -34,6 +47,9 @@ class SkeletonDialog extends Modal {
 	// Open from the start: properties of this scope come first, the rest of the vault follows.
 	private showAll = true;
 	private showHidden = false;
+	private chosen: number | null = null;
+	/** Properties the chosen source checked, so changing the source can uncheck exactly those. */
+	private addedBySource: string[] = [];
 	private readonly keys: Set<string>;
 	private readonly properties: Set<string>;
 	private readonly hidden: Set<string>;
@@ -54,9 +70,40 @@ class SkeletonDialog extends Modal {
 		this.render();
 	}
 
+	private taken(): string[] {
+		const { sources } = this.options;
+		return this.chosen === null || !sources ? [] : (sources[this.chosen]?.properties ?? []);
+	}
+
+	/** Properties of the chosen source first, so what was taken over is easy to see. */
+	private withSource(names: string[]): string[] {
+		const taken = this.taken();
+		return [...taken, ...names.filter((name) => !taken.includes(name))];
+	}
+
 	private listedProperties(): string[] {
 		const { properties, otherProperties } = this.options;
-		return this.showAll ? [...properties, ...otherProperties] : properties;
+		return this.withSource(this.showAll ? [...properties, ...otherProperties] : properties);
+	}
+
+	private async chooseSource(): Promise<void> {
+		const sources = this.options.sources ?? [];
+		const items: (number | "none")[] = sources.map((_, index) => index);
+		if (this.chosen !== null) items.unshift("none");
+		const picked = await pickFrom(
+			this.app,
+			items,
+			(item) => (item === "none" ? NO_SOURCE_LABEL : (sources[item]?.label ?? "")),
+			{ aux: (item) => (item === "none" ? undefined : sources[item]?.aux) },
+		);
+		if (picked === null) return;
+		for (const name of this.addedBySource) this.properties.delete(name);
+		this.addedBySource = [];
+		this.chosen = picked === "none" ? null : picked;
+		const taken = this.taken();
+		this.addedBySource = taken.filter((name) => !this.properties.has(name));
+		for (const name of taken) this.properties.add(name);
+		this.render();
 	}
 
 	private render(): void {
@@ -72,10 +119,18 @@ class SkeletonDialog extends Modal {
 			setting.addToggle((toggle) => this.bind(toggle, this.keys, name));
 		}
 
-		const everything = [...options.properties, ...options.otherProperties];
+		const everything = this.withSource([...options.properties, ...options.otherProperties]);
 		const hiddenCount = everything.filter((name) => this.hidden.has(name)).length;
-		if (everything.length > 0) {
+		const sources = options.sources ?? [];
+		if (everything.length > 0 || sources.length > 0) {
 			const heading = new Setting(contentEl).setName(GROUP_LABELS.notes).setHeading();
+			if (sources.length > 0) {
+				heading.addButton((button) => {
+					const current = this.chosen === null ? undefined : sources[this.chosen];
+					button.setButtonText(current?.label ?? FROM_SOURCE_LABEL).onClick(() => void this.chooseSource());
+					button.buttonEl.toggleClass(ACTIVE_CLASS, current !== undefined);
+				});
+			}
 			if (options.otherProperties.length > 0) {
 				heading.addButton((button) => {
 					button
@@ -126,10 +181,9 @@ class SkeletonDialog extends Modal {
 						this.done = true;
 						this.finish({
 							keys: options.keys.filter((key) => this.keys.has(key)),
-							properties: [...options.properties, ...options.otherProperties].filter(
-								(name) => this.properties.has(name) && !this.hidden.has(name),
-							),
+							properties: everything.filter((name) => this.properties.has(name) && !this.hidden.has(name)),
 							hidden: [...this.hidden],
+							source: this.chosen,
 						});
 						this.close();
 					}),

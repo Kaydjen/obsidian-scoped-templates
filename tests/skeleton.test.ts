@@ -88,3 +88,25 @@ describe("commonKeys edge cases", () => {
 		expect(commonKeys([["a"], []], 0, "tpl-")).toEqual(["a"]);
 	});
 });
+
+describe("buildSkeleton with values from another template", () => {
+	const values = {
+		data: { status: "draft", tags: ["a", "b"], project: "", created: "{{date}}" },
+		stringify: (entry: Record<string, unknown>) => YAML.stringify(entry),
+	};
+
+	it("writes non-empty values, keeps the rest as before", () => {
+		const text = buildSkeleton(["status", "tags", "project", "other"], {}, [], values);
+		const parsed = parseTemplate(text, (yaml) => YAML.parse(yaml));
+		expect(parsed.frontmatter).toEqual({ status: "draft", tags: ["a", "b"], project: null, other: null });
+	});
+
+	it("keeps a template value over the date default", () => {
+		const text = buildSkeleton(["created"], { created: "date" }, [], values);
+		expect(parseTemplate(text, (yaml) => YAML.parse(yaml)).frontmatter).toEqual({ created: "{{date}}" });
+	});
+
+	it("without values nothing changes", () => {
+		expect(buildSkeleton(["status"], {}, [])).toBe("---\nstatus:\n---\n");
+	});
+});

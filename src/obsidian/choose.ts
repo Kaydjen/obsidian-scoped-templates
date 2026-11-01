@@ -4,7 +4,7 @@ import { isInside, parentPath } from "../core/paths";
 import { findByCommand, visibleTemplates, type VisibleTemplate } from "../core/scope";
 import type { Host, PickedTemplate } from "./host";
 import { runNewTemplateFromPicker } from "./new-template";
-import { NEW_TEMPLATE, pickTemplate } from "./picker";
+import { NEW_TEMPLATE, NEW_TEMPLATE_CHOOSE, pickTemplate } from "./picker";
 
 /** One notice for the broken templates whose scope contains `folder`; they are not listed as choices. */
 async function warnAboutInvalid(host: Host, folder: string): Promise<void> {
@@ -41,8 +41,8 @@ export async function chooseTemplate(host: Host, folder: string, command?: strin
 		return null;
 	}
 	const chosen = await pickTemplate(host.app, visible);
-	if (chosen === NEW_TEMPLATE) {
-		await runNewTemplateFromPicker(host, folder);
+	if (chosen === NEW_TEMPLATE || chosen === NEW_TEMPLATE_CHOOSE) {
+		await runNewTemplateFromPicker(host, folder, chosen === NEW_TEMPLATE_CHOOSE);
 		return null;
 	}
 	return chosen ? toPicked(chosen) : null;

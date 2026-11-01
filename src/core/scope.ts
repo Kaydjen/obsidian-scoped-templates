@@ -66,3 +66,41 @@ export function visibleTemplates(
 export function findByCommand(visible: VisibleTemplate[], command: string): VisibleTemplate | undefined {
 	return visible.find((item) => item.template.command === command);
 }
+
+/**
+ * Templates ordered by closeness to `folder` in the folder tree, closest first.
+ * Templates whose scope contains `folder` come first, the deepest first; then the ones sharing the
+ * longest folder prefix, then the ones with the shallower root, then most recently used, then label.
+ */
+export function rankTemplates<T extends { scope: ScopeTemplate }>(
+	entries: T[],
+	folder: string,
+	mru: Record<string, number>,
+): T[] {
+	const target = splitPath(folder);
+	const measure = (entry: T) => {
+		const root = splitPath(entry.scope.root);
+		let shared = 0;
+		while (shared < root.length && shared < target.length && root[shared] === target[shared]) shared++;
+		return { shared, inside: shared === root.length, rootLength: root.length };
+	};
+	const ranked = entries.map((entry) => ({ entry, ...measure(entry) }));
+	ranked.sort(
+		(a, b) =>
+			Number(b.inside) - Number(a.inside) ||
+			b.shared - a.shared ||
+			a.rootLength - b.rootLength ||
+			(mru[b.entry.scope.path] ?? 0) - (mru[a.entry.scope.path] ?? 0) ||
+			a.entry.scope.label.localeCompare(b.entry.scope.label),
+	);
+	return ranked.map((item) => item.entry);
+}
+
+/** The closest template of `rankTemplates`, or undefined when there are none. */
+export function nearestTemplate<T extends { scope: ScopeTemplate }>(
+	entries: T[],
+	folder: string,
+	mru: Record<string, number>,
+): T | undefined {
+	return rankTemplates(entries, folder, mru)[0];
+}

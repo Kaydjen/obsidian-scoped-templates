@@ -1,4 +1,5 @@
 import { KEYS, KNOWN_KEYS } from "../constants";
+import { isEmpty } from "./frontmatter";
 
 const MAX_PROPERTY_KEYS = 12;
 const DATE_VALUES: Record<string, string> = {
@@ -46,18 +47,31 @@ const CONFIG_LINES: Record<string, string> = {
 	[KEYS.command]: `${KEYS.command}:`,
 };
 
+/** Values another template gives to properties, and how to write one `key: value` entry as YAML. */
+export interface PropertyValues {
+	data: Record<string, unknown>;
+	stringify(entry: Record<string, unknown>): string;
+}
+
 /**
  * Text of a new template. Config keys are written with explicit values where the value type
  * is unambiguous (so the Properties editor picks list / checkbox widgets); date-typed
- * properties get the matching `{{date}}`. Everything else stays empty.
+ * properties get the matching `{{date}}`. Everything else stays empty, unless `values`
+ * holds a non-empty value for the property.
  */
 export function buildSkeleton(
 	propertyKeys: string[],
 	propertyTypes: Record<string, string>,
 	configKeys: readonly string[] = KNOWN_KEYS,
+	values?: PropertyValues,
 ): string {
 	const lines = KNOWN_KEYS.filter((key) => configKeys.includes(key)).map((key) => CONFIG_LINES[key] ?? `${key}:`);
 	for (const key of propertyKeys) {
+		const given = values?.data[key];
+		if (values && !isEmpty(given)) {
+			lines.push(values.stringify({ [key]: given }).trimEnd());
+			continue;
+		}
 		const date = DATE_VALUES[propertyTypes[key] ?? ""];
 		lines.push(date === undefined ? `${yamlKey(key)}:` : `${yamlKey(key)}: "${date}"`);
 	}

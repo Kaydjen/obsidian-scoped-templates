@@ -1,9 +1,13 @@
-import { Notice, TFile } from "obsidian";
+import { Notice, TFile, stringifyYaml } from "obsidian";
 import {
+	AVAILABLE_EVERYWHERE_LABEL,
+	COMMON_IN_PREFIX,
+	COMMON_IN_VAULT_LABEL,
 	COPY_BASE_PREFIX,
 	CONFIG_PREFIX,
 	EMPTY_BASE_LABEL,
 	KNOWN_KEYS,
+	MAX_SOURCES,
 	NEW_TEMPLATE_BASENAME,
 	SKELETON_DIALOG_PROPERTY_LIMIT,
 	SKELETON_KEY_THRESHOLD,
@@ -13,12 +17,13 @@ import {
 } from "../constants";
 import { uniqueName } from "../core/filename";
 import { folderAndAncestors, isInside, joinPath, parentPath, splitPath, templateFolderFor } from "../core/paths";
-import { buildSkeleton, commonKeys } from "../core/skeleton";
+import { rankTemplates } from "../core/scope";
+import { buildSkeleton, commonKeys, type PropertyValues } from "../core/skeleton";
 import type { TemplateEntry } from "./discover";
 import { ensureFolder } from "./folders";
 import { errorMessage, type Host } from "./host";
 import { pickFrom } from "./picker";
-import { chooseSkeleton } from "./skeleton-dialog";
+import { chooseSkeleton, type SkeletonSource } from "./skeleton-dialog";
 
 type Base = TemplateEntry | "empty";
 
@@ -62,8 +67,7 @@ async function copyableTemplates(host: Host, scope: string): Promise<TemplateEnt
 		);
 }
 
-async function chooseBase(host: Host, scope: string): Promise<Base | null> {
-	const templates = await copyableTemplates(host, scope);
+async function chooseBase(host: Host, templates: TemplateEntry[]): Promise<Base | null> {
 	if (templates.length === 0) return "empty";
 	return pickFrom<Base>(
 		host.app,
@@ -77,13 +81,53 @@ async function chooseBase(host: Host, scope: string): Promise<Base | null> {
 	);
 }
 
+/** What the note properties of a new template can be taken from: one row per source, closest first. */
+async function propertySources(
+	host: Host,
+	scope: string,
+): Promise<{ source: SkeletonSource; values?: Record<string, unknown> }[]> {
+	const hidden = new Set(host.settings.hiddenProperties);
+	const result: { source: SkeletonSource; values?: Record<string, unknown> }[] = [];
+
+	// The closest folder (this one, then its parents) whose notes have common properties.
+	for (const level of folderAndAncestors(scope)) {
+		const notes = notePropertyKeys(host, level);
+		const common = commonKeys(notes, SKELETON_KEY_THRESHOLD, CONFIG_PREFIX).filter((name) => !hidden.has(name));
+		if (common.length === 0) continue;
+		result.push({
+			source: {
+				label: level === "" ? COMMON_IN_VAULT_LABEL : `${COMMON_IN_PREFIX}${level}`,
+				aux: `${notes.length} ${notes.length === 1 ? "note" : "notes"}`,
+				properties: common,
+			},
+		});
+		break;
+	}
+
+	const { valid } = await host.index.load();
+	for (const entry of rankTemplates(valid, scope, host.settings.mru)) {
+		const properties = Object.keys(entry.parsed.frontmatter).filter((name) => !hidden.has(name));
+		if (properties.length === 0) continue;
+		result.push({
+			source: {
+				label: entry.scope.label,
+				aux: entry.scope.root === "" ? AVAILABLE_EVERYWHERE_LABEL : entry.scope.root,
+				properties,
+			},
+			values: entry.parsed.frontmatter,
+		});
+	}
+	return result.slice(0, MAX_SOURCES);
+}
+
 async function createIn(host: Host, picked: string, choose: boolean): Promise<void> {
 	const { app, settings } = host;
 	const target = templateFolderFor(picked, settings.folderName);
 	if (target === null) return;
 	const scope = parentPath(target);
 
-	const base = await chooseBase(host, scope);
+	const templates = await copyableTemplates(host, scope);
+	const base = await chooseBase(host, templates);
 	if (base === null) return;
 	let content: string;
 	if (base !== "empty") {
@@ -95,7 +139,9 @@ async function createIn(host: Host, picked: string, choose: boolean): Promise<vo
 		const inScope = commonKeys(notes, 0, CONFIG_PREFIX, SKELETON_DIALOG_PROPERTY_LIMIT);
 		let keys: readonly string[] = KNOWN_KEYS;
 		let properties = usual;
+		let values: PropertyValues | undefined;
 		if (choose) {
+			const found = await propertySources(host, scope);
 			const choice = await chooseSkeleton(app, {
 				keys: KNOWN_KEYS,
 				checkedKeys: settings.templateKeys,
@@ -105,15 +151,18 @@ async function createIn(host: Host, picked: string, choose: boolean): Promise<vo
 				),
 				checkedProperties: usual,
 				hiddenProperties: settings.hiddenProperties,
+				sources: found.map((item) => item.source),
 			});
 			if (choice === null) return;
+			const data = choice.source === null ? undefined : found[choice.source]?.values;
+			if (data) values = { data, stringify: (entry) => stringifyYaml(entry) };
 			keys = choice.keys;
 			properties = choice.properties;
 			settings.templateKeys = choice.keys;
 			settings.hiddenProperties = choice.hidden;
 			await host.saveSettings();
 		}
-		content = buildSkeleton(properties, await readPropertyTypes(host), keys);
+		content = buildSkeleton(properties, await readPropertyTypes(host), keys, values);
 	}
 
 	const folder = await ensureFolder(host, target);

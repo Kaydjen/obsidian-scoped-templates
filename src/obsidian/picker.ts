@@ -1,10 +1,15 @@
 import { App, SuggestModal, prepareFuzzySearch } from "obsidian";
-import { AVAILABLE_EVERYWHERE_LABEL, NEW_TEMPLATE_ACTION_LABEL, SEPARATED_CLASS } from "../constants";
+import {
+	AVAILABLE_EVERYWHERE_LABEL,
+	NEW_TEMPLATE_ACTION_LABEL,
+	NEW_TEMPLATE_CHOOSE_ACTION_LABEL,
+	SEPARATED_CLASS,
+} from "../constants";
 import type { VisibleTemplate } from "../core/scope";
 
 export interface PickOptions<T> {
-	/** Always shown after the filtered items. */
-	last?: T;
+	/** Always shown after the filtered items; the first of them gets a divider above it. */
+	last?: T[];
 	/** The first row of a second block: it gets a divider above it. */
 	blockStart?: T;
 	/** Caption of the search field; it names what the list asks for. */
@@ -28,8 +33,7 @@ class ListPicker<T> extends SuggestModal<T> {
 	}
 
 	getSuggestions(query: string): T[] {
-		const { last } = this.options;
-		const tail = last === undefined ? [] : [last];
+		const tail = this.options.last ?? [];
 		if (query.trim() === "") return [...this.items, ...tail];
 		const fuzzy = prepareFuzzySearch(query);
 		const matches = this.items
@@ -56,7 +60,7 @@ class ListPicker<T> extends SuggestModal<T> {
 		}
 		// The trailing item is an action, not one of the choices above it.
 		const { last, blockStart } = this.options;
-		if ((last !== undefined && item === last) || (blockStart !== undefined && item === blockStart)) {
+		if ((last !== undefined && item === last[0]) || (blockStart !== undefined && item === blockStart)) {
 			el.addClass(SEPARATED_CLASS);
 		}
 	}
@@ -85,23 +89,27 @@ export function pickFrom<T>(
 }
 
 export const NEW_TEMPLATE = "new" as const;
+export const NEW_TEMPLATE_CHOOSE = "new-choose" as const;
+type NewTemplateAction = typeof NEW_TEMPLATE | typeof NEW_TEMPLATE_CHOOSE;
 
-/** The list always ends with a "New template" item, so an empty scope is not a dead end. */
-export function pickTemplate(
-	app: App,
-	items: VisibleTemplate[],
-): Promise<VisibleTemplate | typeof NEW_TEMPLATE | null> {
+/** The list always ends with the two "New template" items, so an empty scope is not a dead end. */
+export function pickTemplate(app: App, items: VisibleTemplate[]): Promise<VisibleTemplate | NewTemplateAction | null> {
 	// Same label in different scopes: the folder tells them apart.
 	const counts = new Map<string, number>();
 	for (const { template } of items) counts.set(template.label, (counts.get(template.label) ?? 0) + 1);
-	return pickFrom<VisibleTemplate | typeof NEW_TEMPLATE>(
+	const isAction = (item: VisibleTemplate | NewTemplateAction): item is NewTemplateAction => typeof item === "string";
+	return pickFrom<VisibleTemplate | NewTemplateAction>(
 		app,
 		items,
-		(item) => (item === NEW_TEMPLATE ? NEW_TEMPLATE_ACTION_LABEL : item.template.label),
+		(item) => {
+			if (item === NEW_TEMPLATE) return NEW_TEMPLATE_ACTION_LABEL;
+			if (item === NEW_TEMPLATE_CHOOSE) return NEW_TEMPLATE_CHOOSE_ACTION_LABEL;
+			return item.template.label;
+		},
 		{
-			last: NEW_TEMPLATE,
+			last: [NEW_TEMPLATE, NEW_TEMPLATE_CHOOSE],
 			aux: (item) => {
-				if (item === NEW_TEMPLATE || (counts.get(item.template.label) ?? 0) < 2) return undefined;
+				if (isAction(item) || (counts.get(item.template.label) ?? 0) < 2) return undefined;
 				return item.template.root === "" ? AVAILABLE_EVERYWHERE_LABEL : item.template.root;
 			},
 		},

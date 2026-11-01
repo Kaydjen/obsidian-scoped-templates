@@ -58,6 +58,14 @@ export const NEW_TEMPLATE_CHOOSE_LABEL = "New template, choose keys…";
 export const NEW_TEMPLATE_CHOOSE_ACTION_LABEL = `+ ${NEW_TEMPLATE_CHOOSE_LABEL}`;
 /** Most note properties the choice dialog lists. */
 export const SKELETON_DIALOG_PROPERTY_LIMIT = 30;
+/** Button in the choose-keys dialog that opens the list of sources for note properties. */
+export const FROM_SOURCE_LABEL = "From…";
+/** First row of that list while a source is chosen: it takes the choice back. */
+export const NO_SOURCE_LABEL = "None";
+export const COMMON_IN_PREFIX = "Most common in ";
+export const COMMON_IN_VAULT_LABEL = "Most common in the vault";
+/** Most rows the list of sources shows. */
+export const MAX_SOURCES = 5;
 export const EMPTY_BASE_LABEL = "Empty template";
 /** In front of an existing template in the list of bases: choosing it makes a copy. */
 export const COPY_BASE_PREFIX = "Copy of ";
