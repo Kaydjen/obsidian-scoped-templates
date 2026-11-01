@@ -53,6 +53,13 @@ export class ScopedTemplatesSettingTab extends PluginSettingTab {
 			revertOnBlur(text, () => settings.timeFormat, isFormat);
 		});
 
+		new Setting(containerEl).setName("Join selected words with dashes in file names").addToggle((toggle) =>
+			toggle.setValue(settings.dashSelectionInName).onChange(async (value) => {
+				settings.dashSelectionInName = value;
+				await this.plugin.saveSettings();
+			}),
+		);
+
 		new Setting(containerEl).setName("Copy missing values from nearby notes").addToggle((toggle) =>
 			toggle.setValue(settings.inheritFromNeighbors).onChange(async (value) => {
 				settings.inheritFromNeighbors = value;

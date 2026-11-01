@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeAlias, sanitizeName, uniqueName } from "../src/core/filename";
+import { dashWords, sanitizeAlias,sanitizeName, uniqueName } from "../src/core/filename";
 
 describe("sanitizeName", () => {
 	it("removes characters Obsidian and Windows reject", () => {
@@ -24,6 +24,13 @@ describe("sanitizeName", () => {
 
 	it("keeps cyrillic and digits", () => {
 		expect(sanitizeName("Решение 2610291420")).toBe("Решение 2610291420");
+	});
+});
+
+describe("dashWords", () => {
+	it("joins words with dashes", () => {
+		expect(dashWords("  History of  the\nname ")).toBe("History-of-the-name");
+		expect(dashWords("")).toBe("");
 	});
 });
 

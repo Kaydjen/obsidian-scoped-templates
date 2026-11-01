@@ -97,6 +97,8 @@ export interface PluginSettings {
 	dateFormat: string;
 	timeFormat: string;
 	inheritFromNeighbors: boolean;
+	/** `{{selection}}` in a file name: words joined with dashes (the link text keeps the selection as typed). */
+	dashSelectionInName: boolean;
 	/** Template keys that the "choose keys" dialog had checked last time. */
 	templateKeys: string[];
 	/** Note properties the user hid from the "choose keys" dialog and from new templates. */
@@ -110,6 +112,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 	dateFormat: "YYYY-MM-DD",
 	timeFormat: "HH:mm",
 	inheritFromNeighbors: true,
+	dashSelectionInName: false,
 	templateKeys: [...KNOWN_KEYS],
 	hiddenProperties: [],
 	mru: {},

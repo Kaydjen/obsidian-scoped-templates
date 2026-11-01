@@ -18,6 +18,11 @@ export function sanitizeFolderSegment(raw: string): string {
 	return raw.replace(FOLDER_FORBIDDEN_RE, "").replace(/[. ]+$/, "").trim();
 }
 
+/** "History of the name" -> "History-of-the-name". */
+export function dashWords(raw: string): string {
+	return raw.trim().split(/\s+/).join("-");
+}
+
 /** Text for a link alias: no characters that would break the link. */
 export function sanitizeAlias(raw: string): string {
 	return raw.replace(/[|[\]\r\n]/g, " ").replace(/\s+/g, " ").trim();

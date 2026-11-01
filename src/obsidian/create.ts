@@ -1,6 +1,6 @@
 import { MarkdownView, Notice, TFile, normalizePath, stringifyYaml } from "obsidian";
 import { DEFAULT_FILENAME, DEFAULT_NAME_DATE_FORMAT } from "../constants";
-import { sanitizeAlias, sanitizeName, uniqueName } from "../core/filename";
+import { dashWords, sanitizeAlias,sanitizeName, uniqueName } from "../core/filename";
 import { buildFrontmatter, serializeFrontmatter } from "../core/frontmatter";
 import { joinPath, resolveFolder } from "../core/paths";
 import { extractCursor, splitAlternatives, substitute, substituteChain } from "../core/substitute";
@@ -62,7 +62,10 @@ async function createNote(host: Host, context: ActiveContext, picked: PickedTemp
 	const folderPath = resolveFolder(into, entry.scope.root, context.folder, settings.folderName);
 
 	const defaultName = `${entry.file.basename}-${now.format(DEFAULT_NAME_DATE_FORMAT)}`;
-	const rawName = substituteChain(config.filename ?? DEFAULT_FILENAME, early);
+	const nameDeps = settings.dashSelectionInName
+		? makeSubstituteDeps(host, { ...common, selection: dashWords(context.selection), source: "" })
+		: early;
+	const rawName = substituteChain(config.filename ?? DEFAULT_FILENAME, nameDeps);
 	if (rawName.includes("{{")) throw new Error(`Unresolved variable in file name: ${rawName}`);
 	let name = sanitizeName(rawName);
 	if (name === "") name = sanitizeName(defaultName);
