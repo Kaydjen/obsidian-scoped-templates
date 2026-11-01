@@ -86,6 +86,16 @@ describe("resolveFolder edge cases", () => {
 		expect(resolveFolder("/", "project", "x", "_tpl")).toBe("");
 	});
 
+	it("drops characters Windows rejects in a folder name, keeps # and brackets", () => {
+		expect(resolveFolder("log/12:30", "project", "", "_tpl")).toBe("project/log/1230");
+		expect(resolveFolder('a?b/"c"|d', "", "", "_tpl")).toBe("ab/cd");
+		expect(resolveFolder("#archive/[x]", "", "", "_tpl")).toBe("#archive/[x]");
+	});
+
+	it("drops a segment that sanitizing empties and trailing dots", () => {
+		expect(resolveFolder("a/::/b.", "", "", "_tpl")).toBe("a/b");
+	});
+
 	it("rejects a dot segment", () => {
 		expect(() => resolveFolder("a/./b", "", "", "_tpl")).toThrow(/"\."/);
 	});

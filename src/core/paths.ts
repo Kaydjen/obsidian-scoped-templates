@@ -1,3 +1,5 @@
+import { sanitizeFolderSegment } from "./filename";
+
 /** Vault-relative, `/`-separated paths. The vault root is the empty string. */
 
 export function splitPath(path: string): string[] {
@@ -44,13 +46,17 @@ export function resolveFolder(
 	}
 	const normalized = into.trim().replace(/\\/g, "/");
 	const absolute = normalized.startsWith("/");
-	const segments = splitPath(normalized)
+	const rawSegments = splitPath(normalized)
 		.map((s) => s.trim())
 		.filter((s) => s.length > 0);
-	for (const segment of segments) {
+	for (const segment of rawSegments) {
 		if (segment === ".." || segment === ".") {
 			throw new Error(`tpl-into cannot contain "${segment}": ${into}`);
 		}
+	}
+	// A substituted value such as {{time}} may carry characters a folder name cannot have.
+	const segments = rawSegments.map(sanitizeFolderSegment).filter((s) => s.length > 0);
+	for (const segment of segments) {
 		if (segment === templateFolderName) {
 			throw new Error(`tpl-into cannot point into a "${templateFolderName}" folder: ${into}`);
 		}

@@ -10,6 +10,14 @@ export function sanitizeName(raw: string): string {
 	return name.replace(/[. ]+$/, "");
 }
 
+// eslint-disable-next-line no-control-regex
+const FOLDER_FORBIDDEN_RE = /[:*?"<>|\u0000-\u001f]/g;
+
+/** One folder name: drops what Windows rejects (`#`, `^`, brackets stay: they are legal in folders). */
+export function sanitizeFolderSegment(raw: string): string {
+	return raw.replace(FOLDER_FORBIDDEN_RE, "").replace(/[. ]+$/, "").trim();
+}
+
 /** Text for a link alias: no characters that would break the link. */
 export function sanitizeAlias(raw: string): string {
 	return raw.replace(/[|[\]\r\n]/g, " ").replace(/\s+/g, " ").trim();
