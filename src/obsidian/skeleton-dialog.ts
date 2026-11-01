@@ -31,7 +31,8 @@ export interface SkeletonOptions {
 
 class SkeletonDialog extends Modal {
 	private done = false;
-	private showAll = false;
+	// Open from the start: properties of this scope come first, the rest of the vault follows.
+	private showAll = true;
 	private showHidden = false;
 	private readonly keys: Set<string>;
 	private readonly properties: Set<string>;
