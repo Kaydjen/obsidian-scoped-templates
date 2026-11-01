@@ -48,11 +48,17 @@
 
 .scoped-templates-pane {
 	position: fixed;
-	z-index: var(--layer-popover);
+	/* One above the popover layer, so another popup (e.g. Obsidian's own value suggestions) cannot cover the text. */
+	z-index: calc(var(--layer-popover) + 1);
 	border: 1px solid var(--background-modifier-border);
 	border-radius: var(--radius-m);
 	box-shadow: var(--shadow-s);
 	pointer-events: none;
+}
+
+/* While our option list is open, another suggestion popup (Obsidian's own value list) would overlap it and the panel. */
+.scoped-templates-suggesting .suggestion-container:not(.scoped-templates-suggest) {
+	display: none;
 }
 
 /* Pointing at a property name opens our panel; Obsidian's tooltip with the same name would cover it. */

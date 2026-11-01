@@ -1,5 +1,5 @@
 import { AbstractInputSuggest, type App } from "obsidian";
-import { DETAIL_EXAMPLE_LABEL, PANE_CLASS } from "../constants";
+import { DETAIL_EXAMPLE_LABEL, PANE_CLASS, SUGGESTING_CLASS, SUGGEST_CLASS } from "../constants";
 import {
 	fieldHelp,
 	suggest,
@@ -141,7 +141,9 @@ export class FieldSuggest extends AbstractInputSuggest<Suggestion> {
 		if (!container || container === this.container) return;
 		this.closePane();
 		this.container = container;
-		this.pane = document.body.createDiv({ cls: PANE_CLASS });
+		container.addClass(SUGGEST_CLASS);
+		document.body.addClass(SUGGESTING_CLASS);
+		this.pane =document.body.createDiv({ cls: PANE_CLASS });
 		this.watcher = new MutationObserver(() => this.syncPane());
 		this.watcher.observe(container, { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] });
 		this.syncPane();
@@ -169,6 +171,7 @@ export class FieldSuggest extends AbstractInputSuggest<Suggestion> {
 	}
 
 	private closePane(): void {
+		document.body.removeClass(SUGGESTING_CLASS);
 		this.watcher?.disconnect();
 		this.watcher = null;
 		this.pane?.remove();

@@ -39,6 +39,8 @@ export const TEMPLATE_VIEW_CLASS = "scoped-templates-view";
 /** Set on a property value that holds a `{{variable}}` instead of a literal value. */
 export const VARIABLE_CLASS = "scoped-templates-var";
 export const PANE_CLASS = "scoped-templates-pane";
+export const SUGGEST_CLASS = "scoped-templates-suggest";
+export const SUGGESTING_CLASS = "scoped-templates-suggesting";
 /** Set on the first property of each group (template keys, note properties) in a template view. */
 export const GROUP_START_CLASS = "scoped-templates-group-start";
 export const GROUP_FIRST_CLASS = "scoped-templates-group-first";
