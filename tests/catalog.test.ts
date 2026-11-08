@@ -203,7 +203,7 @@ describe("explanation texts", () => {
 	});
 
 	it("explains every template key", () => {
-		for (const key of ["tpl-label", "tpl-where", "tpl-except", "tpl-into", "tpl-filename", "tpl-open", "tpl-command"]) {
+		for (const key of ["tpl-label", "tpl-where", "tpl-except", "tpl-into", "tpl-filename", "tpl-open", "tpl-link", "tpl-command"]) {
 			const help = keyHelp(key, ctx({ templateName: "Decision" }));
 			expect(help?.help).toBe(true);
 			expect(help?.definition).toMatch(/^Lets you /);

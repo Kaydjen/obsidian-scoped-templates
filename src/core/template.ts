@@ -9,6 +9,8 @@ export interface TemplateConfig {
 	into?: string;
 	filename?: string;
 	open: boolean;
+	/** false: no link to the new note is inserted at the cursor. */
+	link: boolean;
 	command?: string;
 }
 
@@ -99,6 +101,10 @@ function extractConfig(raw: Record<string, unknown>): TemplateConfig {
 	if (open !== undefined && open !== null && typeof open !== "boolean") {
 		throw new Error(`${KEYS.open} must be true or false`);
 	}
+	const link = raw[KEYS.link];
+	if (link !== undefined && link !== null && typeof link !== "boolean") {
+		throw new Error(`${KEYS.link} must be true or false`);
+	}
 	const command = asString(raw[KEYS.command], KEYS.command);
 	if (command !== undefined && !COMMAND_RE.test(command)) {
 		throw new Error(`${KEYS.command} may only contain letters, digits, - and _`);
@@ -108,6 +114,7 @@ function extractConfig(raw: Record<string, unknown>): TemplateConfig {
 		where: asPatterns(raw[KEYS.where], KEYS.where),
 		except: asPatterns(raw[KEYS.except], KEYS.except) ?? [],
 		open: open === true,
+		link: link !== false,
 	};
 	const label = asString(raw[KEYS.label], KEYS.label);
 	if (label !== undefined && label.trim() !== "") config.label = label.trim();

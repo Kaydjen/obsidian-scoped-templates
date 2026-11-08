@@ -25,6 +25,11 @@ export default class ScopedTemplatesPlugin extends Plugin implements Host {
 		this.index = new TemplateIndex(this.app, () => this.settings.folderName);
 
 		this.addCommand({ id: COMMANDS.create.id, name: COMMANDS.create.name, callback: () => void runCreate(this) });
+		this.addCommand({
+			id: COMMANDS.createNoLink.id,
+			name: COMMANDS.createNoLink.name,
+			callback: () => void runCreate(this, undefined, false),
+		});
 		this.addCommand({ id: COMMANDS.apply.id, name: COMMANDS.apply.name, callback: () => void runApply(this) });
 		this.addCommand({
 			id: COMMANDS.showScope.id,

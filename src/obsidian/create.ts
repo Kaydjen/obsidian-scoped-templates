@@ -19,22 +19,28 @@ import {
 } from "./host";
 import { ensureFolder } from "./folders";
 
-export async function runCreate(host: Host, command?: string): Promise<void> {
+/** `insertLink: false` creates the note without a link at the cursor, whatever the template says. */
+export async function runCreate(host: Host, command?: string, insertLink = true): Promise<void> {
 	try {
-		await create(host, command);
+		await create(host, command, insertLink);
 	} catch (error) {
 		new Notice(errorMessage(error));
 	}
 }
 
-async function create(host: Host, command?: string): Promise<void> {
+async function create(host: Host, command: string | undefined, insertLink: boolean): Promise<void> {
 	const context = getActiveContext(host.app);
 	const picked = await chooseTemplate(host, context.folder, command);
 	if (!picked) return;
-	await withLabel(picked.entry.scope.label, () => createNote(host, context, picked));
+	await withLabel(picked.entry.scope.label, () => createNote(host, context, picked, insertLink));
 }
 
-async function createNote(host: Host, context: ActiveContext, picked: PickedTemplate): Promise<void> {
+async function createNote(
+	host: Host,
+	context: ActiveContext,
+	picked: PickedTemplate,
+	insertLink: boolean,
+): Promise<void> {
 	const { app, settings } = host;
 	const { entry, captures } = picked;
 	const { config } = entry.parsed;
@@ -95,7 +101,8 @@ async function createNote(host: Host, context: ActiveContext, picked: PickedTemp
 	// The note exists from here on; any failure below keeps it.
 	await host.recordUse(entry.scope.path);
 
-	if (context.editor && context.file) {
+	const linked = insertLink && config.link && context.editor !== null && context.file !== null;
+	if (linked && context.editor && context.file) {
 		const alias = sanitizeAlias(context.selection);
 		const link = app.fileManager.generateMarkdownLink(
 			file,
@@ -106,7 +113,12 @@ async function createNote(host: Host, context: ActiveContext, picked: PickedTemp
 		context.editor.replaceSelection(link);
 	}
 
-	if (config.open || !context.editor) await openFile(host, file, offset === null ? null : block.length + offset);
+	if (config.open || !context.editor) {
+		await openFile(host, file, offset === null ? null : block.length + offset);
+	} else if (!linked) {
+		// Nothing else shows that the note exists.
+		new Notice(`Created ${finalName}`);
+	}
 }
 
 async function openFile(host: Host, file: TFile, cursor: number | null): Promise<void> {

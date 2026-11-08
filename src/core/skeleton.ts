@@ -44,6 +44,7 @@ const CONFIG_LINES: Record<string, string> = {
 	[KEYS.into]: `${KEYS.into}:`,
 	[KEYS.filename]: `${KEYS.filename}:`,
 	[KEYS.open]: `${KEYS.open}: false`,
+	[KEYS.link]: `${KEYS.link}: true`,
 	[KEYS.command]: `${KEYS.command}:`,
 };
 

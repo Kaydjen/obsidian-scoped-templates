@@ -62,6 +62,9 @@ describe("parseTemplate", () => {
 		expect(parsed.config.except).toHaveLength(1);
 		expect(parsed.config.into).toBe("{{project}}/decisions");
 		expect(parsed.config.open).toBe(true);
+		expect(parsed.config.link).toBe(true);
+		expect(parse("---\ntpl-link: false\n---\n").config.link).toBe(false);
+		expect(parse("---\ntpl-link:\n---\n").config.link).toBe(true);
 		expect(parsed.config.command).toBe("decision");
 		expect(parsed.frontmatter).toEqual({
 			project: "{{from:project}}",
@@ -73,7 +76,7 @@ describe("parseTemplate", () => {
 
 	it("defaults for a template without config", () => {
 		const parsed = parse("---\nlinks:\n---\ntext");
-		expect(parsed.config).toEqual({ where: null, except: [], open: false });
+		expect(parsed.config).toEqual({ where: null, except: [], open: false, link: true });
 		expect(parsed.frontmatter).toEqual({ links: null });
 	});
 
@@ -87,6 +90,7 @@ describe("parseTemplate", () => {
 		expect(() => parse("---\na: [1\n---\n")).toThrow(/Properties are broken/);
 		expect(() => parse("---\ntpl-wher: x\n---\n")).toThrow(/tpl-wher is not a template key/);
 		expect(() => parse("---\ntpl-open: yes please\n---\n")).toThrow(/tpl-open/);
+		expect(() => parse("---\ntpl-link: maybe\n---\n")).toThrow(/tpl-link must be true or false/);
 		expect(() => parse("---\ntpl-where: 5\n---\n")).toThrow(/tpl-where/);
 		expect(() => parse('---\ntpl-where: "{{x}}/{{x}}"\n---\n')).toThrow(/used twice/);
 		expect(() => parse('---\ntpl-where: "{{date}}"\n---\n')).toThrow(/already a variable/);
@@ -122,7 +126,7 @@ describe("config value edge cases", () => {
 	});
 
 	it("treats empty frontmatter and a comment-only block as no config", () => {
-		expect(parse("---\n---\nbody").config).toEqual({ where: null, except: [], open: false });
+		expect(parse("---\n---\nbody").config).toEqual({ where: null, except: [], open: false, link: true });
 		expect(parse("---\n# only a comment\n---\nbody").frontmatter).toEqual({});
 	});
 

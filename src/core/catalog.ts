@@ -612,6 +612,7 @@ const KEY_DEFINITIONS: Record<string, string> = {
 	[KEYS.into]: "Lets you choose the folder where the new note is saved.",
 	[KEYS.filename]: "Lets you choose the name of the new note.",
 	[KEYS.open]: "Lets you choose whether the new note opens right after it is created.",
+	[KEYS.link]: "Lets you choose whether a link to the new note appears where your cursor is.",
 	[KEYS.command]: "Lets you run this template with a hotkey.",
 };
 
@@ -652,6 +653,9 @@ export function keyHelp(key: string, ctx: CatalogContext): Suggestion | null {
 			break;
 		case KEYS.open:
 			scenario = "unchecked, the new note is created in the background and a link to it appears where your cursor is. If no note is being edited, it opens anyway.";
+			break;
+		case KEYS.link:
+			scenario = "unchecked, the new note is created and nothing is added to the note you are editing.";
 			break;
 		case KEYS.command: {
 			const label =ctx.templateLabel ?? name;

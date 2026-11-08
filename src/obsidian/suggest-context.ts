@@ -124,6 +124,7 @@ export function kindForKey(key: string): FieldKind | null {
 		case KEYS.label:
 		case KEYS.command:
 		case KEYS.open:
+		case KEYS.link:
 			return null;
 		default:
 			return "value";

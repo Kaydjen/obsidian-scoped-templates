@@ -9,6 +9,7 @@ export const KEYS = {
 	into: `${CONFIG_PREFIX}into`,
 	filename: `${CONFIG_PREFIX}filename`,
 	open: `${CONFIG_PREFIX}open`,
+	link: `${CONFIG_PREFIX}link`,
 	command: `${CONFIG_PREFIX}command`,
 } as const;
 
@@ -84,6 +85,7 @@ export const SKELETON_KEY_THRESHOLD = 0.5;
 
 export const COMMANDS = {
 	create: { id: "create", name: "Create from template" },
+	createNoLink: { id: "create-no-link", name: "Create from template without link" },
 	apply: { id: "apply", name: "Apply template" },
 	showScope: { id: "show-scope", name: "Show templates here" },
 	createPrefix: "create-",
